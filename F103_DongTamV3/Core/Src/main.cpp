@@ -17,12 +17,16 @@
  */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <Protocol.h>
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <Protocol.h>
 #include "string.h"
+#include "74HC595.h"
+#include "74HC165.h"
+#include "AMS5915.h"
+#include <ValveControlProcess.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,6 +45,10 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
+I2C_HandleTypeDef hi2c1;
+
 TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart1;
@@ -48,6 +56,10 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 uint8_t a[1] = {0};
+Protocol p;
+ValveControl vc;
+uint8_t txBuffer[100] = {0};
+uint8_t rxBuffer[100] = {0};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -56,6 +68,8 @@ static void MX_GPIO_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_ADC1_Init(void);
+static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -63,8 +77,17 @@ static void MX_USART3_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	__NOP();
+	p.receiveDataInterrupt(huart);
 }
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+	if (huart == &huart1) {
+//		HAL_UART_DMAStop(huart); // Stop DMA reception
+//		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*) uartEsp32Buffer, MAX_MESSAGE);
+//		Brd_ESP32_SetConnectIsFalse();
+	}
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -97,9 +120,24 @@ int main(void) {
 	MX_TIM3_Init();
 	MX_USART1_UART_Init();
 	MX_USART3_UART_Init();
+	MX_ADC1_Init();
+	MX_I2C1_Init();
 	/* USER CODE BEGIN 2 */
-	HAL_UART_Transmit(&huart3, (uint8_t*) "HelloWorld\n", sizeof("HelloWorld\n"), HAL_MAX_DELAY);
-	HAL_UART_Receive_IT(&huart3, a, 1);
+	vc.assignControlPin(_74HC595_CLK_GPIO_Port, _74HC595_CLK_Pin, HC595_CLK);
+	vc.assignControlPin(_74HC595_DATA_GPIO_Port, _74HC595_DATA_Pin, HC595_DS);
+	vc.assignControlPin(_74HC595_STORE_GPIO_Port, _74HC595_STORE_Pin, HC595_LATCH);
+	vc.setTotalValve(16);
+	vc.begin();
+	for (uint8_t i = 0; i < 16; i++) {
+		vc.setOutputValve(i, 1);
+		HAL_Delay(100);
+	}
+
+	for (uint8_t i = 0; i < 16; i++) {
+		vc.setOutputValve(i, 0);
+		HAL_Delay(100);
+	}
+
 	HAL_GPIO_WritePin(BlueLED_GPIO_Port, BlueLED_Pin, GPIO_PIN_RESET);
 	HAL_Delay(1000);
 	HAL_GPIO_WritePin(BlueLED_GPIO_Port, BlueLED_Pin, GPIO_PIN_SET);
@@ -124,6 +162,7 @@ int main(void) {
 void SystemClock_Config(void) {
 	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
 	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+	RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
 	/** Initializes the RCC Oscillators according to the specified parameters
 	 * in the RCC_OscInitTypeDef structure.
@@ -147,6 +186,87 @@ void SystemClock_Config(void) {
 	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK) {
 		Error_Handler();
 	}
+	PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+	PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV2;
+	if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
+		Error_Handler();
+	}
+}
+
+/**
+ * @brief ADC1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_ADC1_Init(void) {
+
+	/* USER CODE BEGIN ADC1_Init 0 */
+
+	/* USER CODE END ADC1_Init 0 */
+
+	ADC_ChannelConfTypeDef sConfig = {0};
+
+	/* USER CODE BEGIN ADC1_Init 1 */
+
+	/* USER CODE END ADC1_Init 1 */
+
+	/** Common config
+	 */
+	hadc1.Instance = ADC1;
+	hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+	hadc1.Init.ContinuousConvMode = DISABLE;
+	hadc1.Init.DiscontinuousConvMode = DISABLE;
+	hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+	hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+	hadc1.Init.NbrOfConversion = 1;
+	if (HAL_ADC_Init(&hadc1) != HAL_OK) {
+		Error_Handler();
+	}
+
+	/** Configure Regular Channel
+	 */
+	sConfig.Channel = ADC_CHANNEL_9;
+	sConfig.Rank = ADC_REGULAR_RANK_1;
+	sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN ADC1_Init 2 */
+
+	/* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+ * @brief I2C1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_I2C1_Init(void) {
+
+	/* USER CODE BEGIN I2C1_Init 0 */
+
+	/* USER CODE END I2C1_Init 0 */
+
+	/* USER CODE BEGIN I2C1_Init 1 */
+
+	/* USER CODE END I2C1_Init 1 */
+	hi2c1.Instance = I2C1;
+	hi2c1.Init.ClockSpeed = 100000;
+	hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+	hi2c1.Init.OwnAddress1 = 0;
+	hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+	hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+	hi2c1.Init.OwnAddress2 = 0;
+	hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+	hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+	if (HAL_I2C_Init(&hi2c1) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN I2C1_Init 2 */
+
+	/* USER CODE END I2C1_Init 2 */
+
 }
 
 /**
@@ -283,12 +403,6 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(BlueLED_GPIO_Port, &GPIO_InitStruct);
 
-	/*Configure GPIO pin : PC14 */
-	GPIO_InitStruct.Pin = GPIO_PIN_14;
-	GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
 	/*Configure GPIO pins : _74HC595_CLK_Pin _74HC595_STORE_Pin _74HC595_DATA_Pin OE_Pin */
 	GPIO_InitStruct.Pin = _74HC595_CLK_Pin | _74HC595_STORE_Pin | _74HC595_DATA_Pin | OE_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -308,10 +422,6 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-	/* EXTI interrupt init*/
-	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
-	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 	/* USER CODE BEGIN MX_GPIO_Init_2 */
 	/* USER CODE END MX_GPIO_Init_2 */

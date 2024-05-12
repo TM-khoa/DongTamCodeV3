@@ -10,7 +10,13 @@
 
 #include "main.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 uint16_t crc16_Unreflected(const uint8_t *buf, uint32_t len, uint16_t crc_init);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* INC_CRC16_H_ */

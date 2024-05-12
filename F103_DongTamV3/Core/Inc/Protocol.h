@@ -9,7 +9,7 @@
 #define INC_PROTOCOL_H_
 
 #include "main.h"
-#include "CRC16.h"
+#include <CRC16.h>
 #include <string>
 #include <cstring>
 

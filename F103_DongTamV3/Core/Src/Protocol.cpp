@@ -6,6 +6,7 @@
  */
 
 #include <Protocol.h>
+#include "CRC16.h"
 
 void Protocol::jumpToError(ProtocolErrorCode err) {
 	if (_pProlErr != NULL) {
