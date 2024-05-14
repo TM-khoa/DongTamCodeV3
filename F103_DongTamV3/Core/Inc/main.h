@@ -50,6 +50,7 @@ extern "C" {
 #define CONFIG_USE_74HC165
 #define CONFIG_USE_PCF8563
 #define CONFIG_USE_AMS5915
+
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/

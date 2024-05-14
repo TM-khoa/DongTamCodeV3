@@ -27,29 +27,29 @@ class ValveControl {
 
 	public:
 
-		void begin();
-		void assignControlPin(GPIO_TypeDef *gpio, uint16_t pin, HC595_PinName HC595_PinName);
-		void increaseTick();
-		void setTick(uint16_t tick);
-		uint16_t getTick();
+		void Begin();
+		void AssignControlPin(GPIO_TypeDef *gpio, uint16_t pin, HC595_PinName HC595_PinName);
+		void IncreaseTick();
+		void SetTick(uint16_t tick);
+		uint16_t GetTick();
 
-		HAL_StatusTypeDef setTotalValve(uint8_t totalValve);
-		uint8_t getTotalValve();
+		HAL_StatusTypeDef SetTotalValve(uint8_t totalValve);
+		uint8_t GetTotalValve();
 
-		HAL_StatusTypeDef setPulseTime(uint16_t pulseTime);
-		uint16_t getPulseTime();
+		HAL_StatusTypeDef SetPulseTime(uint16_t pulseTime);
+		uint16_t GetPulseTime();
 
-		HAL_StatusTypeDef setCurrentValveOn(uint16_t currentValveOn);
-		uint16_t getCurrentValveOn();
+		HAL_StatusTypeDef SetCurrentValveOn(uint16_t currentValveOn);
+		uint16_t GetCurrentValveOn();
 
-		HAL_StatusTypeDef setIntervalTime(uint16_t intervalTime);
-		uint16_t getIntervalTime();
+		HAL_StatusTypeDef SetIntervalTime(uint16_t intervalTime);
+		uint16_t GetIntervalTime();
 
-		void setOutputValve(uint8_t valve, bool on);
-		void setOutputMultiValve(uint16_t valve, bool on);
+		void SetOutputValve(uint8_t valve, bool on);
+		void SetOutputMultiValve(uint16_t valve, bool on);
 
-		void startValveProcess();
-		void stopValveProcess();
+		void StartValveProcess();
+		void StopValveProcess();
 
 };
 

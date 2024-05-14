@@ -27,6 +27,8 @@
 #include "74HC165.h"
 #include "AMS5915.h"
 #include <ValveControlProcess.h>
+#include "PCF8563.h"
+#include "MessageHandle.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,8 +58,12 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 uint8_t a[1] = {0};
-Protocol p;
 ValveControl vc;
+PCF8563 pcf;
+AMS5915 ams;
+RTC_t t;
+MessageHandle mesg;
+float pressure;
 uint8_t txBuffer[100] = {0};
 uint8_t rxBuffer[100] = {0};
 /* USER CODE END PV */
@@ -77,7 +83,6 @@ static void MX_I2C1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	p.receiveDataInterrupt(huart);
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
@@ -123,21 +128,37 @@ int main(void) {
 	MX_ADC1_Init();
 	MX_I2C1_Init();
 	/* USER CODE BEGIN 2 */
-	vc.assignControlPin(_74HC595_CLK_GPIO_Port, _74HC595_CLK_Pin, HC595_CLK);
-	vc.assignControlPin(_74HC595_DATA_GPIO_Port, _74HC595_DATA_Pin, HC595_DS);
-	vc.assignControlPin(_74HC595_STORE_GPIO_Port, _74HC595_STORE_Pin, HC595_LATCH);
-	vc.setTotalValve(16);
-	vc.begin();
+
+	vc.AssignControlPin(_74HC595_CLK_GPIO_Port, _74HC595_CLK_Pin, HC595_CLK);
+	vc.AssignControlPin(_74HC595_DATA_GPIO_Port, _74HC595_DATA_Pin, HC595_DS);
+	vc.AssignControlPin(_74HC595_STORE_GPIO_Port, _74HC595_STORE_Pin, HC595_LATCH);
+	vc.SetTotalValve(16);
+	vc.Begin();
+	pcf.Begin(&hi2c1);
+	pcf.StartClock();
+	pcf.EnableCLKOUT(1);
+	pcf.SetFrequencyCLKOUT(CLKOUT_1_Hz);
+	t.hour = 13;
+	t.minute = 25;
+	t.day = 13;
+	t.month = 5;
+	t.year = 23;
+	t.weekday = 1;
+	pcf.WriteTimeRegisters(t);
+	ams.Begin(&hi2c1);
+	pressure = ams.GetPressure();
+	HAL_ADC_Start(&hadc1);
+	pcf.ReadTimeRegisters();
 	for (uint8_t i = 0; i < 16; i++) {
-		vc.setOutputValve(i, 1);
+		vc.SetOutputValve(i, 1);
 		HAL_Delay(100);
 	}
 
 	for (uint8_t i = 0; i < 16; i++) {
-		vc.setOutputValve(i, 0);
+		vc.SetOutputValve(i, 0);
 		HAL_Delay(100);
 	}
-
+	HAL_UART_Transmit(&huart3, (uint8_t*) "HelloWorld\n", sizeof("HelloWorld\n"), HAL_MAX_DELAY);
 	HAL_GPIO_WritePin(BlueLED_GPIO_Port, BlueLED_Pin, GPIO_PIN_RESET);
 	HAL_Delay(1000);
 	HAL_GPIO_WritePin(BlueLED_GPIO_Port, BlueLED_Pin, GPIO_PIN_SET);
