@@ -10,6 +10,16 @@
 
 #define VALVE_TO_TRIGGER (_totalValve - _valveRemainToTrigger)
 void ValveControl::InValveOnProcess() {
+	/*
+	 * nếu totalValve thay đổi (nhỏ hơn giá trị trước đó)
+	 * thì khi trừ sẽ bị âm với int8_t và ra số rất lớn(uint8_t) - lớn hơn nhiều
+	 * so với tổng số valve hiện có, do đó phải quay về ban đầu cập nhật lại
+	 * _valveRemainToTrigger mới
+	 */
+	if (VALVE_TO_TRIGGER < 0) {
+		_processStep = PROCESS_START;
+		return;
+	}
 	SetOutputValve(VALVE_TO_TRIGGER, 1);
 	_processStep = PROCESS_PULSE_TIME;
 	_timerTick = 0;
@@ -21,19 +31,29 @@ void ValveControl::InPulseTimeProcess() {
 	}
 }
 void ValveControl::InValveOffProcess() {
+	/*
+	 * nếu totalValve thay đổi (nhỏ hơn giá trị trước đó)
+	 * thì khi trừ sẽ bị âm với int8_t và ra số rất lớn(uint8_t) - lớn hơn nhiều
+	 * so với tổng số valve hiện có, do đó phải quay về ban đầu cập nhật lại
+	 * _valveRemainToTrigger mới
+	 */
+
+	if (VALVE_TO_TRIGGER < 0) {
+		_processStep = PROCESS_START;
+		return;
+	}
 	SetOutputValve(VALVE_TO_TRIGGER, 0);
 	_timerTick = 0;
 	_processStep = PROCESS_INTERVAL_TIME;
 }
 void ValveControl::InIntervalTimeProcess() {
 	if (_timerTick * TIMER_PERIOD_MS >= _intervalTime * 1000) {
-		if (_valveRemainToTrigger - 1 == 0) {
-			_processStep = PROCESS_CYCLE_INTERVAL_TIME;
-		}
-		else {
-			_valveRemainToTrigger--;
-			_processStep = PROCESS_VALVE_ON;
-		}
+		_valveRemainToTrigger--;
+		_processStep = PROCESS_VALVE_ON;
+		_timerTick = 0;
+	}
+	else if (_valveRemainToTrigger - 1 == 0) {
+		_processStep = PROCESS_CYCLE_INTERVAL_TIME;
 		_timerTick = 0;
 	}
 }
@@ -76,6 +96,7 @@ void ValveControl::ValveProcessRun() {
 }
 void ValveControl::StartValveProcess() {
 	_isOnProcess = true;
+	_processStep = PROCESS_START;
 
 }
 void ValveControl::StopValveProcess() {
@@ -96,9 +117,9 @@ ValveControl::ValveControl() {
 	AssignControlPin(_74HC595_DATA_GPIO_Port, _74HC595_DATA_Pin, HC595_DS);
 	AssignControlPin(_74HC595_STORE_GPIO_Port, _74HC595_STORE_Pin, HC595_LATCH);
 	_totalValve = 16;
-	_pulseTime = 300;
-	_intervalTime = 6;
-	_cycleIntervalTime = 5;
+	_pulseTime = 50;
+	_intervalTime = 1;
+	_cycleIntervalTime = 3;
 
 	if (_totalValve > MAX_NUM_VAN)
 		while (1);
@@ -107,7 +128,6 @@ ValveControl::ValveControl() {
 		n = 2;
 	else if (_totalValve < 8 && _totalValve > 0)
 		n = 1;
-	HC595_SetTarget(&_hc595);
 	HC595_ClearByteOutput(0xffffffff);
 	HC595_ShiftOut(NULL, n, 1);
 	_isOnProcess = false;
@@ -137,6 +157,8 @@ void ValveControl::SetTotalValve(uint8_t totalValve) {
 		_totalValve = MAX_NUM_VAN;
 	else
 		_totalValve = totalValve;
+	if (_processStep != PROCESS_IDLE)
+		_processStep = PROCESS_START;
 }
 uint8_t ValveControl::GetTotalValve() {
 	return _totalValve;
@@ -182,18 +204,13 @@ uint8_t ValveControl::GetCycleIntervalTime() {
 void ValveControl::SetOutputValve(uint8_t valve, bool on) {
 	if (valve > MAX_NUM_VAN)
 		while (1);
-	uint8_t n = 0;
-	if (_totalValve > 8)
-		n = 2;
-	else if (_totalValve < 8 && _totalValve > 0)
-		n = 1;
 	if (on) {
 		HC595_SetBitOutput(valve);
 	}
 	else {
 		HC595_ClearBitOutput(valve);
 	}
-	HC595_ShiftOut(NULL, n, 1);
+	HC595_ShiftOut(NULL, 2, 1);
 }
 
 ValveFeedback::ValveFeedback() {

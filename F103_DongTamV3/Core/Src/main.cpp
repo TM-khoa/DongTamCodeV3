@@ -29,6 +29,7 @@
 #include <ValveControlProcess.h>
 #include "PCF8563.h"
 #include "MessageHandle.h"
+#include "RTC_Format.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,12 +62,14 @@ uint8_t a[1] = {0};
 ValveControl vc;
 PCF8563 pcf;
 AMS5915 ams;
-RTC_t t;
+RTC_t tCurrent, tPCF8563;
 MessageHandle mesg;
 float pressure;
-uint16_t rtcTick_s = 0;
+uint32_t rtcTick_s = 0;
+uint8_t testCount = 0;
 uint8_t txBuffer[100] = {0};
 uint8_t rxBuffer[100] = {0};
+bool read;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -83,6 +86,8 @@ static void MX_I2C1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+RTC_t GetCurrentTimeFromTick(RTC_t timeFromRTC, uint16_t tick);
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	mesg.CallbackFromUART(huart);
 }
@@ -99,7 +104,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if (GPIO_Pin == GPIO_PIN_14) {
 		// one tick = 1 second
 		if (rtcTick_s > UPDATE_TIME_RTC_TICK) {
-			t = pcf.ReadTimeRegisters();
+			tPCF8563 = pcf.ReadTimeRegisters();
 			rtcTick_s = 0;
 
 		}
@@ -110,9 +115,41 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM3) {
-		if (vc.IsOnProcess()) vc.IncreaseTick();
+		if (vc.IsOnProcess())
+			vc.IncreaseTick();
 	}
 }
+
+RTC_t GetCurrentTimeFromTick(RTC_t timeFromRTC, uint32_t tick) {
+	RTC_t currentRTC;
+	currentRTC.second = timeFromRTC.second;
+	currentRTC.minute = timeFromRTC.minute;
+	currentRTC.hour = timeFromRTC.hour;
+	currentRTC.day = timeFromRTC.day;
+	currentRTC.weekday = timeFromRTC.weekday;
+	currentRTC.month = timeFromRTC.month;
+	currentRTC.year = timeFromRTC.year;
+
+	currentRTC.second += RTC_ConvertTickElapsedToSecond(tick);
+	currentRTC.minute += RTC_ConvertTickElapsedToMinute(tick);
+	currentRTC.hour += RTC_ConvertTickElapsedToHour(tick);
+
+	if (currentRTC.second > 59) {
+		currentRTC.second -= 60;
+		currentRTC.minute++;
+	}
+	if (currentRTC.minute > 59) {
+		currentRTC.minute -= 60;
+		currentRTC.hour++;
+	}
+	if (currentRTC.hour > 23) {
+		currentRTC.hour -= 24;
+		currentRTC.day++;
+		currentRTC.weekday++;
+	}
+	return currentRTC;
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -149,19 +186,12 @@ int main(void) {
 	MX_I2C1_Init();
 	/* USER CODE BEGIN 2 */
 	HAL_TIM_Base_Start_IT(&htim3);
-	pcf.Begin(&hi2c1);
 	ams.Begin(&hi2c1);
 	HAL_ADC_Start(&hadc1);
-	t = pcf.ReadTimeRegisters();
-	for (uint8_t i = 0; i < 16; i++) {
-		vc.SetOutputValve(i, 1);
-		HAL_Delay(100);
-	}
 
-	for (uint8_t i = 0; i < 16; i++) {
-		vc.SetOutputValve(i, 0);
-		HAL_Delay(100);
-	}
+//	pcf.Begin(&hi2c1);
+//	tPCF8563 = pcf.ReadTimeRegisters();
+
 	HAL_UART_Transmit(&huart3, (uint8_t*) "HelloWorld\n", sizeof("HelloWorld\n"), HAL_MAX_DELAY);
 	HAL_GPIO_WritePin(BlueLED_GPIO_Port, BlueLED_Pin, GPIO_PIN_RESET);
 	HAL_Delay(1000);
@@ -454,6 +484,10 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+	/* EXTI interrupt init*/
+	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 	/* USER CODE BEGIN MX_GPIO_Init_2 */
 	/* USER CODE END MX_GPIO_Init_2 */

@@ -47,10 +47,10 @@ class ValveControl {
 	private:
 
 		uint16_t _timerTick;
-		uint16_t _pulseTime; // thời gian kích van
-		uint16_t _intervalTime; // thời gian nghỉ giữa 2 lần kích van
-		uint16_t _valveRemainToTrigger; // số van còn lại trong chu trình cần phải kích
-		uint8_t _cycleIntervalTime; //thời gian nghỉ giữa 2 chu kỳ kích van (khoảng nghỉ sau khi kích van cuối cùng và bắt đầu chu trình mới)
+		uint16_t _pulseTime; // thời gian kích van, tính bằng ms
+		uint16_t _intervalTime; // thời gian nghỉ giữa 2 lần kích van, tính bằng s
+		uint8_t _valveRemainToTrigger; // số van còn lại trong chu trình cần phải kích
+		uint8_t _cycleIntervalTime; //thời gian nghỉ giữa 2 chu kỳ kích van (khoảng nghỉ sau khi kích van cuối cùng và bắt đầu chu trình mới), tính bằng s
 		uint8_t _totalValve;
 		bool _isOnProcess;
 		ValveControlProcessStep _processStep;
