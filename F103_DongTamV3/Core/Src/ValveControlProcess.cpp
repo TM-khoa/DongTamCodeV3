@@ -8,23 +8,105 @@
 
 #include <ValveControlProcess.h>
 
+#define VALVE_TO_TRIGGER (_totalValve - _valveRemainToTrigger)
+void ValveControl::InValveOnProcess() {
+	SetOutputValve(VALVE_TO_TRIGGER, 1);
+	_processStep = PROCESS_PULSE_TIME;
+	_timerTick = 0;
+}
+void ValveControl::InPulseTimeProcess() {
+	if (_timerTick * TIMER_PERIOD_MS > _pulseTime) {
+		_timerTick = 0;
+		_processStep = PROCESS_VALVE_OFF;
+	}
+}
+void ValveControl::InValveOffProcess() {
+	SetOutputValve(VALVE_TO_TRIGGER, 0);
+	_timerTick = 0;
+	_processStep = PROCESS_INTERVAL_TIME;
+}
+void ValveControl::InIntervalTimeProcess() {
+	if (_timerTick * TIMER_PERIOD_MS >= _intervalTime * 1000) {
+		if (_valveRemainToTrigger - 1 == 0) {
+			_processStep = PROCESS_CYCLE_INTERVAL_TIME;
+		}
+		else {
+			_valveRemainToTrigger--;
+			_processStep = PROCESS_VALVE_ON;
+		}
+		_timerTick = 0;
+	}
+}
+void ValveControl::InCycleIntervalTimeProcess() {
+	if (_timerTick * TIMER_PERIOD_MS >= _cycleIntervalTime * 1000) {
+		_processStep = PROCESS_START;
+		_timerTick = 0;
+	}
+}
+
+void ValveControl::ValveProcessRun() {
+	if (_isOnProcess == false)
+		return;
+	switch (_processStep) {
+	case PROCESS_IDLE:
+		break;
+	case PROCESS_START:
+		_valveRemainToTrigger = _totalValve;
+		_processStep = PROCESS_VALVE_ON;
+		break;
+	case PROCESS_VALVE_ON:
+		InValveOnProcess();
+		break;
+	case PROCESS_PULSE_TIME:
+		InPulseTimeProcess();
+		break;
+	case PROCESS_VALVE_OFF:
+		InValveOffProcess();
+		break;
+	case PROCESS_INTERVAL_TIME:
+		InIntervalTimeProcess();
+		break;
+	case PROCESS_CYCLE_INTERVAL_TIME:
+		InCycleIntervalTimeProcess();
+		break;
+	case PROCESS_END:
+		break;
+
+	}
+}
 void ValveControl::StartValveProcess() {
 	_isOnProcess = true;
+
 }
 void ValveControl::StopValveProcess() {
 	_isOnProcess = false;
+	_timerTick = 0;
+}
+
+bool ValveControl::IsOnProcess() {
+	return _isOnProcess;
+}
+
+ValveControlProcessStep ValveControl::GetProcessStep() {
+	return _processStep;
 }
 
 ValveControl::ValveControl() {
 	AssignControlPin(_74HC595_CLK_GPIO_Port, _74HC595_CLK_Pin, HC595_CLK);
 	AssignControlPin(_74HC595_DATA_GPIO_Port, _74HC595_DATA_Pin, HC595_DS);
 	AssignControlPin(_74HC595_STORE_GPIO_Port, _74HC595_STORE_Pin, HC595_LATCH);
-	SetTotalValve(16);
-	if (_totalValve > MAX_NUM_VAN) while (1);
+	_totalValve = 16;
+	_pulseTime = 300;
+	_intervalTime = 6;
+	_cycleIntervalTime = 5;
+
+	if (_totalValve > MAX_NUM_VAN)
+		while (1);
 	uint8_t n = 0;
 	if (_totalValve > 8)
 		n = 2;
-	else if (_totalValve < 8 && _totalValve > 0) n = 1;
+	else if (_totalValve < 8 && _totalValve > 0)
+		n = 1;
 	HC595_SetTarget(&_hc595);
 	HC595_ClearByteOutput(0xffffffff);
 	HC595_ShiftOut(NULL, n, 1);
@@ -36,7 +118,8 @@ ValveControl::~ValveControl() {
 }
 
 void ValveControl::AssignControlPin(GPIO_TypeDef *gpio, uint16_t pin, HC595_PinName HC595_PinName) {
-	if (HC595_AssignPin(&_hc595, gpio, pin, HC595_PinName) != HC595_OK) while (1);
+	if (HC595_AssignPin(&_hc595, gpio, pin, HC595_PinName) != HC595_OK)
+		while (1);
 }
 
 void ValveControl::IncreaseTick() {
@@ -49,49 +132,61 @@ uint16_t ValveControl::GetTick() {
 	return _timerTick;
 }
 
-HAL_StatusTypeDef ValveControl::SetTotalValve(uint8_t totalValve) {
-	if (totalValve > MAX_NUM_VAN) return HAL_ERROR;
-	_totalValve = totalValve;
-	return HAL_OK;
+void ValveControl::SetTotalValve(uint8_t totalValve) {
+	if (totalValve > MAX_NUM_VAN)
+		_totalValve = MAX_NUM_VAN;
+	else
+		_totalValve = totalValve;
 }
 uint8_t ValveControl::GetTotalValve() {
 	return _totalValve;
 }
 
-HAL_StatusTypeDef ValveControl::SetPulseTime(uint16_t pulseTime) {
-	if (pulseTime < 30 || pulseTime > 300) return HAL_ERROR;
-	_pulseTime = pulseTime;
-	return HAL_OK;
+void ValveControl::SetPulseTime(uint16_t pulseTime) {
+	if (pulseTime < 30)
+		pulseTime = 30;
+	else if (pulseTime > 300)
+		pulseTime = 300;
+	else
+		_pulseTime = pulseTime;
 }
 uint16_t ValveControl::GetPulseTime() {
 	return _pulseTime;
 }
 
-HAL_StatusTypeDef ValveControl::SetCurrentValveOn(uint16_t currentValveOn) {
-	if (currentValveOn > MAX_NUM_VAN) return HAL_ERROR;
-	_currentValveOn = currentValveOn;
-	return HAL_OK;
-}
-uint16_t ValveControl::GetCurrentValveOn() {
-	return _currentValveOn;
-}
-
-HAL_StatusTypeDef ValveControl::SetIntervalTime(uint16_t intervalTime) {
-	if (intervalTime > 0 && intervalTime <= 100) {
+void ValveControl::SetIntervalTime(uint16_t intervalTime) {
+	if (intervalTime < 0)
+		intervalTime = 0;
+	else if (intervalTime > 100)
+		_intervalTime = 100;
+	else
 		_intervalTime = intervalTime;
-	}
-	return HAL_ERROR;
 }
 uint16_t ValveControl::GetIntervalTime() {
 	return _intervalTime;
 }
 
+void ValveControl::SetCycleIntervalTime(uint8_t cycleIntervalTime) {
+	if (cycleIntervalTime < 2)
+		_cycleIntervalTime = 2;
+	else if (cycleIntervalTime > 100)
+		_cycleIntervalTime = 100;
+	else
+		_cycleIntervalTime = cycleIntervalTime;
+
+}
+uint8_t ValveControl::GetCycleIntervalTime() {
+	return _cycleIntervalTime;
+}
+
 void ValveControl::SetOutputValve(uint8_t valve, bool on) {
-	if (valve > MAX_NUM_VAN) while (1);
+	if (valve > MAX_NUM_VAN)
+		while (1);
 	uint8_t n = 0;
 	if (_totalValve > 8)
 		n = 2;
-	else if (_totalValve < 8 && _totalValve > 0) n = 1;
+	else if (_totalValve < 8 && _totalValve > 0)
+		n = 1;
 	if (on) {
 		HC595_SetBitOutput(valve);
 	}
@@ -115,3 +210,4 @@ uint16_t ValveFeedback::GetInputValue() {
 	inputValue = (uint16_t) HC165_ReadState(EXPANDER_INPUT_PORT);
 	return inputValue;
 }
+

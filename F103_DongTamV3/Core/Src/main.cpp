@@ -108,6 +108,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	}
 }
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+	if (htim->Instance == TIM3) {
+		if (vc.IsOnProcess()) vc.IncreaseTick();
+	}
+}
 /* USER CODE END 0 */
 
 /**
@@ -143,6 +148,7 @@ int main(void) {
 	MX_ADC1_Init();
 	MX_I2C1_Init();
 	/* USER CODE BEGIN 2 */
+	HAL_TIM_Base_Start_IT(&htim3);
 	pcf.Begin(&hi2c1);
 	ams.Begin(&hi2c1);
 	HAL_ADC_Start(&hadc1);
@@ -167,9 +173,7 @@ int main(void) {
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1) {
-
-		HAL_Delay(1000);
-		pressure = ams.GetPressure();
+		vc.ValveProcessRun();
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */

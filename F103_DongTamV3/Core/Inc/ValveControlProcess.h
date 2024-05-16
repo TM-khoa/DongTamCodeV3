@@ -16,6 +16,22 @@
 #define MAX_NUM_VAN 16
 #define EXPANDER_INPUT_PORT 2
 
+typedef enum ValveControlProcessStep {
+	PROCESS_IDLE,
+	PROCESS_START,
+	PROCESS_VALVE_ON,
+	PROCESS_PULSE_TIME,
+	PROCESS_VALVE_OFF,
+	PROCESS_INTERVAL_TIME,
+	PROCESS_CYCLE_INTERVAL_TIME,
+	PROCESS_END,
+} ValveControlProcessStep;
+
+//typedef enum ResumeValveControlProcessBehavior {
+//	RESUME_RESET_TO_FIRST_VALVE,
+//	RESUME_CONTINUE_TO_NEXT_VALVE,
+//} ResumeValveControlProcessBehavior;
+
 class ValveFeedback {
 	public:
 		ValveFeedback();
@@ -33,11 +49,18 @@ class ValveControl {
 		uint16_t _timerTick;
 		uint16_t _pulseTime; // thời gian kích van
 		uint16_t _intervalTime; // thời gian nghỉ giữa 2 lần kích van
-		uint16_t _cycleIntervalTime; //thời gian nghỉ giữa 2 chu kỳ kích van (khoảng nghỉ sau khi kích van cuối cùng và bắt đầu chu trình mới)
-		uint16_t _currentValveOn;
+		uint16_t _valveRemainToTrigger; // số van còn lại trong chu trình cần phải kích
+		uint8_t _cycleIntervalTime; //thời gian nghỉ giữa 2 chu kỳ kích van (khoảng nghỉ sau khi kích van cuối cùng và bắt đầu chu trình mới)
 		uint8_t _totalValve;
 		bool _isOnProcess;
+		ValveControlProcessStep _processStep;
 		HC595 _hc595;
+		void InValveOnProcess();
+		void InPulseTimeProcess();
+		void InValveOffProcess();
+		void InIntervalTimeProcess();
+		void InCycleIntervalTimeProcess();
+		void NextValve();
 
 	public:
 		ValveControl();
@@ -47,24 +70,26 @@ class ValveControl {
 		void SetTick(uint16_t tick);
 		uint16_t GetTick();
 
-		HAL_StatusTypeDef SetTotalValve(uint8_t totalValve);
+		void SetTotalValve(uint8_t totalValve);
 		uint8_t GetTotalValve();
 
-		HAL_StatusTypeDef SetPulseTime(uint16_t pulseTime);
+		void SetPulseTime(uint16_t pulseTime);
 		uint16_t GetPulseTime();
 
-		HAL_StatusTypeDef SetCurrentValveOn(uint16_t currentValveOn);
-		uint16_t GetCurrentValveOn();
-
-		HAL_StatusTypeDef SetIntervalTime(uint16_t intervalTime);
+		void SetIntervalTime(uint16_t intervalTime);
 		uint16_t GetIntervalTime();
+
+		void SetCycleIntervalTime(uint8_t cycleIntervalTime);
+		uint8_t GetCycleIntervalTime();
 
 		void SetOutputValve(uint8_t valve, bool on);
 		void SetOutputMultiValve(uint16_t valve, bool on);
 
 		bool IsOnProcess();
+		ValveControlProcessStep GetProcessStep();
 		void StartValveProcess();
 		void StopValveProcess();
+		void ValveProcessRun();
 
 };
 

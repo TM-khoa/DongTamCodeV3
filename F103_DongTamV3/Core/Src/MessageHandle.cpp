@@ -53,6 +53,7 @@ MessageHandle::MessageHandle() {
 	pESP32.RegisterReceivedCallbackEvent(&MessageHandleCommandID);
 	pESP32.Init((void*) &huart1, espTxBuf, sizeof(espTxBuf), espRxBuf, sizeof(espRxBuf));
 
+	_isHandShake = false;
 }
 
 MessageHandle::~MessageHandle() {
