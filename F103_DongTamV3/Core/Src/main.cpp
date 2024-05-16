@@ -33,7 +33,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+#define UPDATE_TIME_RTC_TICK 3600
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -64,6 +64,7 @@ AMS5915 ams;
 RTC_t t;
 MessageHandle mesg;
 float pressure;
+uint16_t rtcTick_s = 0;
 uint8_t txBuffer[100] = {0};
 uint8_t rxBuffer[100] = {0};
 /* USER CODE END PV */
@@ -83,6 +84,7 @@ static void MX_I2C1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	mesg.CallbackFromUART(huart);
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
@@ -90,6 +92,19 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
 //		HAL_UART_DMAStop(huart); // Stop DMA reception
 //		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*) uartEsp32Buffer, MAX_MESSAGE);
 //		Brd_ESP32_SetConnectIsFalse();
+	}
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	if (GPIO_Pin == GPIO_PIN_14) {
+		// one tick = 1 second
+		if (rtcTick_s > UPDATE_TIME_RTC_TICK) {
+			t = pcf.ReadTimeRegisters();
+			rtcTick_s = 0;
+
+		}
+		else
+			rtcTick_s++;
 	}
 }
 
@@ -128,27 +143,10 @@ int main(void) {
 	MX_ADC1_Init();
 	MX_I2C1_Init();
 	/* USER CODE BEGIN 2 */
-
-	vc.AssignControlPin(_74HC595_CLK_GPIO_Port, _74HC595_CLK_Pin, HC595_CLK);
-	vc.AssignControlPin(_74HC595_DATA_GPIO_Port, _74HC595_DATA_Pin, HC595_DS);
-	vc.AssignControlPin(_74HC595_STORE_GPIO_Port, _74HC595_STORE_Pin, HC595_LATCH);
-	vc.SetTotalValve(16);
-	vc.Begin();
 	pcf.Begin(&hi2c1);
-	pcf.StartClock();
-	pcf.EnableCLKOUT(1);
-	pcf.SetFrequencyCLKOUT(CLKOUT_1_Hz);
-	t.hour = 13;
-	t.minute = 25;
-	t.day = 13;
-	t.month = 5;
-	t.year = 23;
-	t.weekday = 1;
-	pcf.WriteTimeRegisters(t);
 	ams.Begin(&hi2c1);
-	pressure = ams.GetPressure();
 	HAL_ADC_Start(&hadc1);
-	pcf.ReadTimeRegisters();
+	t = pcf.ReadTimeRegisters();
 	for (uint8_t i = 0; i < 16; i++) {
 		vc.SetOutputValve(i, 1);
 		HAL_Delay(100);
@@ -169,6 +167,9 @@ int main(void) {
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1) {
+
+		HAL_Delay(1000);
+		pressure = ams.GetPressure();
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
@@ -423,6 +424,12 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(BlueLED_GPIO_Port, &GPIO_InitStruct);
+
+	/*Configure GPIO pin : PC14 */
+	GPIO_InitStruct.Pin = GPIO_PIN_14;
+	GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
 	/*Configure GPIO pins : _74HC595_CLK_Pin _74HC595_STORE_Pin _74HC595_DATA_Pin OE_Pin */
 	GPIO_InitStruct.Pin = _74HC595_CLK_Pin | _74HC595_STORE_Pin | _74HC595_DATA_Pin | OE_Pin;

@@ -9,13 +9,17 @@
 #include <ValveControlProcess.h>
 
 void ValveControl::StartValveProcess() {
-
+	_isOnProcess = true;
 }
 void ValveControl::StopValveProcess() {
-
+	_isOnProcess = false;
 }
 
-void ValveControl::Begin() {
+ValveControl::ValveControl() {
+	AssignControlPin(_74HC595_CLK_GPIO_Port, _74HC595_CLK_Pin, HC595_CLK);
+	AssignControlPin(_74HC595_DATA_GPIO_Port, _74HC595_DATA_Pin, HC595_DS);
+	AssignControlPin(_74HC595_STORE_GPIO_Port, _74HC595_STORE_Pin, HC595_LATCH);
+	SetTotalValve(16);
 	if (_totalValve > MAX_NUM_VAN) while (1);
 	uint8_t n = 0;
 	if (_totalValve > 8)
@@ -24,7 +28,13 @@ void ValveControl::Begin() {
 	HC595_SetTarget(&_hc595);
 	HC595_ClearByteOutput(0xffffffff);
 	HC595_ShiftOut(NULL, n, 1);
+	_isOnProcess = false;
 }
+
+ValveControl::~ValveControl() {
+
+}
+
 void ValveControl::AssignControlPin(GPIO_TypeDef *gpio, uint16_t pin, HC595_PinName HC595_PinName) {
 	if (HC595_AssignPin(&_hc595, gpio, pin, HC595_PinName) != HC595_OK) while (1);
 }
@@ -91,3 +101,17 @@ void ValveControl::SetOutputValve(uint8_t valve, bool on) {
 	HC595_ShiftOut(NULL, n, 1);
 }
 
+ValveFeedback::ValveFeedback() {
+	HC165_AssignPin(&expanderInput, _74HC165_CLK_GPIO_Port, _74HC165_CLK_Pin, HC165_CP);
+	HC165_AssignPin(&expanderInput, _74HC165_DATA_GPIO_Port, _74HC165_DATA_Pin, HC165_DATA);
+	HC165_AssignPin(&expanderInput, _74HC165_LOAD_GPIO_Port, _74HC165_LOAD_Pin, HC165_PL);
+}
+
+ValveFeedback::~ValveFeedback() {
+
+}
+
+uint16_t ValveFeedback::GetInputValue() {
+	inputValue = (uint16_t) HC165_ReadState(EXPANDER_INPUT_PORT);
+	return inputValue;
+}

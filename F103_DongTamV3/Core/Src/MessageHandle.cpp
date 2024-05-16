@@ -6,7 +6,7 @@
  */
 
 #include <MessageHandle.h>
-#include "Protocol.h"
+
 extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart3;
 
@@ -25,8 +25,13 @@ void MessageReceive(void *portCommunicate, uint8_t *data, uint16_t size) {
 	HAL_UART_Receive_IT((UART_HandleTypeDef*) portCommunicate, data, size);
 }
 
-void Message_HandleCommandID(ProtocolListID protocolID, GetSetFlag getOrSet) {
+void MessageHandleCommandID(ProtocolListID protocolID, GetSetFlag getOrSet) {
 
+}
+
+void MessageHandle::CallbackFromUART(UART_HandleTypeDef *huart) {
+	pLog.HandleReceiveDataInterrupt((void*) &huart);
+	pESP32.HandleReceiveDataInterrupt((void*) &huart);
 }
 
 void MessageError(ProtocolErrorCode err) {
@@ -39,13 +44,13 @@ MessageHandle::MessageHandle() {
 	pLog.RegisterReceiveFrameFunction(&MessageReceive);
 	pLog.RegisterSendFrameFunction(&MessageSend);
 	pLog.RegisterErrorEvent(&MessageError);
-	pLog.RegisterReceivedCallbackEvent(&Message_HandleCommandID);
+	pLog.RegisterReceivedCallbackEvent(&MessageHandleCommandID);
 	pLog.Init((void*) &huart3, logTxBuf, sizeof(logTxBuf), logRxBuf, sizeof(logRxBuf));
 
 	pESP32.RegisterReceiveFrameFunction(&MessageReceive);
 	pESP32.RegisterSendFrameFunction(&MessageSend);
 	pESP32.RegisterErrorEvent(&MessageError);
-	pESP32.RegisterReceivedCallbackEvent(&Message_HandleCommandID);
+	pESP32.RegisterReceivedCallbackEvent(&MessageHandleCommandID);
 	pESP32.Init((void*) &huart1, espTxBuf, sizeof(espTxBuf), espRxBuf, sizeof(espRxBuf));
 
 }

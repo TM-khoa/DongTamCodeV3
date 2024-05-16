@@ -10,9 +10,22 @@
 
 #include "main.h"
 #include "74HC595.h"
+#include "74HC165.h"
 
 #define TIMER_PERIOD_MS 10
 #define MAX_NUM_VAN 16
+#define EXPANDER_INPUT_PORT 2
+
+class ValveFeedback {
+	public:
+		ValveFeedback();
+		~ValveFeedback();
+		void SetInputValue(uint16_t value);
+		uint16_t GetInputValue();
+	private:
+		uint32_t inputValue;
+		HC165_t expanderInput;
+};
 
 class ValveControl {
 	private:
@@ -23,11 +36,12 @@ class ValveControl {
 		uint16_t _cycleIntervalTime; //thời gian nghỉ giữa 2 chu kỳ kích van (khoảng nghỉ sau khi kích van cuối cùng và bắt đầu chu trình mới)
 		uint16_t _currentValveOn;
 		uint8_t _totalValve;
+		bool _isOnProcess;
 		HC595 _hc595;
 
 	public:
-
-		void Begin();
+		ValveControl();
+		~ValveControl();
 		void AssignControlPin(GPIO_TypeDef *gpio, uint16_t pin, HC595_PinName HC595_PinName);
 		void IncreaseTick();
 		void SetTick(uint16_t tick);
@@ -48,6 +62,7 @@ class ValveControl {
 		void SetOutputValve(uint8_t valve, bool on);
 		void SetOutputMultiValve(uint16_t valve, bool on);
 
+		bool IsOnProcess();
 		void StartValveProcess();
 		void StopValveProcess();
 
