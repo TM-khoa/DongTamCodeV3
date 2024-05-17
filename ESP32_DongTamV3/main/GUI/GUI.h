@@ -5,6 +5,8 @@
 #include "esp_check.h"
 #include "PressureBar.h"
 #include "StatusLED.h"
+#include "ButtonGUI.h"
+#include "freertos/FreeRTOS.h"
 
 void TaskManageGUI(void *pvParameter);
 void InitGUI();

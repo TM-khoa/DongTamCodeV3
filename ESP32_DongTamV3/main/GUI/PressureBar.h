@@ -16,6 +16,7 @@ class PressureBar{
 private:
     HC595 _hc595;    
 public:
+
     void Begin();
     void SetLevel(uint8_t level);
     uint8_t CalculateLevelFromPressure(uint32_t max, uint32_t min, float value);
