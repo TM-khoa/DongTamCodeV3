@@ -1,3 +1,6 @@
 [submodule "F103_DongTamV3/STM32-Library"]
 	path = F103_DongTamV3/STM32-Library
 	url = https://github.com/TM-khoa/STM32-Library.git
+[submodule "ESP32_DongTamV3/components"]
+	path = ESP32_DongTamV3/components
+	url = https://github.com/TM-khoa/ESP32-Library.git
