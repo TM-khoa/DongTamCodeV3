@@ -4,6 +4,7 @@
 #include "esp_err.h"
 #include "esp_check.h"
 #include "PressureBar.h"
+#include "StatusLED.h"
 
 void TaskManageGUI(void *pvParameter);
 void InitGUI();

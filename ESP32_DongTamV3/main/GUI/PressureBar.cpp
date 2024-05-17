@@ -4,7 +4,7 @@
 void PressureBar::SetLevel(uint8_t level){
     if(level > 10) return;
     for(uint8_t i = 0; i <= level; i++){
-        HC595_SetBitOutput(10-i);
+        HC595_SetBitOutput(10 - i);
     }
     HC595_ShiftOut(NULL,2,1);
     HC595_ClearByteOutput(PRESSURE_BAR_MAX_BITMASK);
@@ -55,7 +55,7 @@ void PressureBar::Begin(){
     }
     for(uint8_t i = 0; i < 11; i++){
         SetLevel(10 - i);
-        vTaskDelay(1000/portTICK_PERIOD_MS);
+        vTaskDelay(50/portTICK_PERIOD_MS);
     }
 }
 
