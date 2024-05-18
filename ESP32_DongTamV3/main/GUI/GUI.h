@@ -6,6 +6,9 @@
 #include "PressureBar.h"
 #include "StatusLED.h"
 #include "ButtonGUI.h"
+#include "i2cdev.h"
+#include "PCF8574.hpp"
+#include "LCD_I2C.hpp"
 #include "freertos/FreeRTOS.h"
 
 void TaskManageGUI(void *pvParameter);
