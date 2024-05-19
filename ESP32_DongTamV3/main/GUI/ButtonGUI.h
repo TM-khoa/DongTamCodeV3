@@ -21,6 +21,7 @@ typedef enum EventButton{
     EVT_BTN_SET,
     EVT_BTN_UP,
     EVT_BTN_DOWN_RIGHT,
+    EVT_LCD_RESET,
 }EventButton;
 
 #define SET_BIT_EVENT(_EVT_BTN_) (1 << (_EVT_BTN_))
