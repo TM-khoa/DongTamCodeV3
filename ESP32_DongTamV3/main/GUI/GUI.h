@@ -11,6 +11,23 @@
 #include "LCD_I2C.hpp"
 #include "freertos/FreeRTOS.h"
 
+
+
+class GUI_Manager
+{
+private:
+    /* private methods */
+    void ClearPointer();
+    void ShowPointer();
+    void LoadPageInit();
+    /* data */
+
+public:
+
+};
+
+
 void TaskManageGUI(void *pvParameter);
+TaskHandle_t* GUI_GetTaskHandle();
 void InitGUI();
 #endif

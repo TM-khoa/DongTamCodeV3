@@ -14,10 +14,12 @@
 #include "esp_system.h"
 #include "GUI/GUI.h"
 #include "GUI/PressureBar.h"
+#include "BoardParameter.h"
 
 extern "C" void app_main(void)
 {
-    InitGUI();
+    // InitGUI();
+    InitBoardParameter();
     xTaskCreate(TaskManageGUI, "GUITask", 4096, NULL, 2, NULL);
     while(1){
         vTaskDelay(10/portTICK_PERIOD_MS);

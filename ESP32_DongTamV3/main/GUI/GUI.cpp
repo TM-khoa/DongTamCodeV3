@@ -2,8 +2,17 @@
 
 PressureBar pBar;
 StatusLED ledError(LED_ERROR_MASK),ledStatus(LED_STATUS_MASK);
-ButtonGUI btnGUI;
+extern ButtonGUI btnGUI;
 ClassLCDI2C lcdI2C;
+TaskHandle_t taskHandleGUI;
+
+/**
+ * @brief Dùng để nhận thông tin từ các task khác thông qua phương pháp TaskNotify
+ * Đây là đối số truyền vào khi khởi tạo GUITask dùng hàm xTaskCreate
+ * 
+ * @return TaskHandle_t* 
+ */
+TaskHandle_t* GUI_GetTaskHandle(){ return &taskHandleGUI;}
 
 void TaskManageGUI(void *pvParameter)
 {
@@ -12,7 +21,6 @@ void TaskManageGUI(void *pvParameter)
         if(xTaskNotifyWait(pdFALSE,pdTRUE,&e,10/portTICK_PERIOD_MS)){
 
         }
-        vTaskDelay(10/portTICK_PERIOD_MS);
     }
 }
 
@@ -20,8 +28,9 @@ void InitGUI()
 {
     /***********************************************Init section************************************************/
     pBar.Begin(); 
-    btnGUI.Begin();
+    
     lcdI2C.begin();
+    lcdI2C.TurnOnBackLight();
     /***********************************************Test section************************************************/
 
     // Cần phải gọi pBar.Begin(); trước vì class PressureBar có khai báo chân 74HC595, cần thiết để xuất LED status
@@ -29,7 +38,6 @@ void InitGUI()
     // Chạy vòng lặp không thoát trong phần test nút nhấn GUI, chỉ dùng để test
     // btnGUI.TestScanBtn();
 
-    lcdI2C.TurnOnBackLight();
     lcdI2C.print("DongTamV3",0,0);
     lcdI2C.print("DongTamV3",0,1);
     lcdI2C.print("DongTamV3",0,2);

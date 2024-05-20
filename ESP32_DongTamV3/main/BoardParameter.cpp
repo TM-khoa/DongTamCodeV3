@@ -33,59 +33,253 @@ const char *DPmode[] = {
     "F0",
 };
 
-const char *TriggerValve[] = {
+const char *triggerValve[] = {
     "On",
     "Off",
 };
 
-const char* paramUnit[] = {
-        "Pa",
-        "ms",
-        "s",
-        "h",
+ParamID preID;
+
+uint16_t paramInt[]= {
+    0,//total
+    6,//down cyc
+    3,// clean mode
+    3,// test mode
+    50,// contrast
+    700,//dp low
+    1300,//dp high
+    2300,//warn
+    1000,//odc high
+    250,//odc low
+    60,//pulse
+    10,//interval
+    6,//cyc
+    0,//oper h
+    3000,// serv run
+    0,// serv alarm
 };
 
-template<typename T> 
-struct Parameter_t params[21];
+Parameter_t params[22];
+BoardParameter brdParam;
 
-template<typename T> 
-void BrdParam_SetParameter(struct Parameter_t *param,const char* keyName, T value, DataType dataType, uint8_t stepChange, uint16_t minValue, uint16_t maxValue){
+uint8_t GetIndexFromParamID(ParamID id){
+    uint8_t i = 0;
+    uint8_t numOfParamElement = sizeof(params) / sizeof(Parameter_t);
+    for(i = 0; i < numOfParamElement;i++){
+        if(params[i].id == id) return i;
+    }
+    return 255;
+}
+
+
+
+
+
+void BoardParameter::SetParameter(Parameter_t *param, const char* keyName, void* value, DataType dataType, ParamID id, uint8_t stepChange, uint16_t minValue, uint16_t maxValue,const char* unit){
     param->keyName = keyName;
+    param->unit = unit;
     param->value = value;
-    param->dataType = dataType
     param->stepChange = stepChange;
+    param->dataType = dataType;
     param->minValue = minValue;
     param->maxValue = maxValue;
-}
-
-void BrdParam_Init(){
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[0], "TotalValve", 0, TYPE_UINT16, 1, 0, 16);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[1], "DownTCycle", 6, TYPE_UINT16, 1, 0, 32);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[2], "CleanMode ", 3, TYPE_UINT16, 1, 1, 5);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[3], "TestMode  ", 3, TYPE_UINT16, 1, 0, 7);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[4], "Contrast  ", 50, TYPE_UINT16, 5, 10, 200);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[5], "DP-Low    ", 700, TYPE_UINT16, 50, 250, 4000);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[6], "DP-High   ", 1300, TYPE_UINT16, 50, 250, 4000);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[7], "DP-Alarm  ", 2300, TYPE_UINT16, 50, 300, 5000);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[8], "ODC High  ", 1000, TYPE_UINT16, 50, 250, 4000);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[9], "ODC Low   ", 250, TYPE_UINT16, 50, 250, 4000);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[10],"Pulse Time", 60, TYPE_UINT16, 10, 40, 300);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[10],"Inter Time", 10, TYPE_UINT16, 2, 40, 500);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[11],"Cycle Time", 60, TYPE_UINT16, 1, 20, 100);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[12],"OperHour  ", 0, TYPE_UINT16, 100, 0, 25000);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[13],"ServRunH  ", 3000, TYPE_UINT16, 100, 0, 25000);
-    BrdParam_SetParameter<uint16_t>(params<uint16_t>[14],"ServAlarm ", 0, TYPE_UINT16, 100, 0, 25000);
+    param->id = id;
+    // ESP_LOGI("SetParam","id:%d,dataType:%d",id,param->dataType);
 
 }
 
-
-uint8_t FindTotalStringArrayElements(const char **string, size_t sizeOfArray)
+void BoardParameter::SetParameter(Parameter_t *param, const char* keyName, void* value, DataType dataType, ParamID id, uint8_t index, uint8_t maxElement,const  char* unit)
 {
-    for(uint8_t i = 0; i < 255; i++){
-        if(*(string + i) == NULL){
-            printf("%u\n",i - 1);
-            return i - 1;
-        }
+    param->keyName = keyName;
+    param->unit = unit;
+    param->value = value;
+    param->dataType = dataType;
+    param->maxValue = maxElement;
+    param->id = id;
+    // ESP_LOGI("SetParam","id:%d,dataType:%d",id,param->dataType);
+}
+
+
+void BoardParameter::IncreaseNextValue(ParamID id){
+    uint8_t i = 0;
+    if(id != preID) {
+        i = GetIndexFromParamID(id);
+        preID = id;
     }
-    return 0;
+    DataType dataType = params[i].dataType;
+    switch(dataType){
+        case TYPE_UINT8:{
+            uint8_t *a = (uint8_t*)params[i].value;
+            *a += params[i].stepChange;
+            if(*a >= params[i].maxValue) *a = params[i].maxValue;
+        }
+        break;
+        case TYPE_UINT16:{
+            uint16_t *a = (uint16_t*)params[i].value;
+            *a += params[i].stepChange;
+            if(*a >= params[i].maxValue) *a = params[i].maxValue;
+        }
+        break;
+        case TYPE_UINT32:{
+            uint32_t *a = (uint32_t*)params[i].value;
+            *a += params[i].stepChange;
+            if(*a >= params[i].maxValue) *a = params[i].maxValue;
+        }
+        break;
+        case TYPE_FLOAT:{
+            float *a = (float*)params[i].value;
+            *a += params[i].stepChange;
+            if(*a >= params[i].maxValue) *a = params[i].maxValue;
+        }
+        break;
+        case TYPE_STRING:{
+            params[i].index++;
+            if(params[i].index >= params[i].maxValue) params[i].index = params[i].maxValue;
+        }
+        break;
+        default:
+        break;
+    }
+    
+}
+void BoardParameter::DecreasePreviousValue(ParamID id){
+    uint8_t i = 0;
+    if(id != preID) {
+        i = GetIndexFromParamID(id);
+        preID = id;
+    }
+    DataType dataType = params[i].dataType;
+    switch(dataType){
+        case TYPE_UINT8:{
+            uint8_t *a = (uint8_t*)params[i].value;
+            *a -= params[i].stepChange;
+            if(*a <= params[i].minValue) *a = params[i].minValue;
+        }
+        break;
+        case TYPE_UINT16:{
+            uint16_t *a = (uint16_t*)params[i].value;
+            *a -= params[i].stepChange;
+            if(*a <= params[i].minValue) *a = params[i].minValue;
+        }
+        break;
+        case TYPE_UINT32:{
+            uint32_t *a = (uint32_t*)params[i].value;
+            *a -= params[i].stepChange;
+            if(*a <= params[i].minValue) *a = params[i].minValue;
+        }
+        break;
+        case TYPE_FLOAT:{
+            float *a = (float*)params[i].value;
+            *a -= params[i].stepChange;
+            if(*a <= params[i].minValue) *a = params[i].minValue;
+        }
+        break;
+        case TYPE_STRING:{
+            params[i].index--;
+            if(params[i].index <= 0) params[i].index = 0;
+        }
+        break;
+        default:
+        break;
+    }
+    
+}
+
+esp_err_t BoardParameter::GetParameter(Parameter_t *param, ParamID id, uint16_t *value){
+    uint8_t i = 0;
+    if(id != preID) {
+        i = GetIndexFromParamID(id);
+        preID = id;
+    }
+    // ESP_LOGI("GetParam","i:%u,id:%d,dataType:%d",i,id,params[i].dataType);
+    if(params[i].dataType != TYPE_UINT16) return ESP_ERR_INVALID_ARG;
+    *value = *(uint16_t*)params[i].value;
+    *param = params[i];
+    return ESP_OK;
+}
+
+esp_err_t BoardParameter::GetParameter(Parameter_t *param, ParamID id, char *value, uint16_t sizeOfOutputString){
+    uint8_t i = 0;
+    if(id != preID) {
+        i = GetIndexFromParamID(id);
+        preID = id;
+    }
+    // ESP_LOGI("GetParam","i:%u,id:%d,dataType:%d",i,id,params[i].dataType);
+    if(params[i].dataType != TYPE_STRING) return ESP_ERR_INVALID_ARG;
+    // if(strlen((const char*)*(params[i].value + params[i].index)) > sizeOfOutputString) return ESP_ERR_INVALID_ARG;
+    /**
+     * Con trỏ void* mà params.value đang trỏ tới là con trỏ cấp hai **s trỏ tới mảng chuỗi (con trỏ cấp một là trỏ tới chuỗi)
+     * Do đó cần phải ép kiểu về con trỏ cấp hai trước ((char**)s + i)(với i là phần tử thứ i của mảng chuỗi), 
+     * sau đó lấy giá trị *(s + i) là giá trị của phần tử thuộc mảng chuỗi (hay chính là chuỗi - con trỏ cấp một)
+    */ 
+    strcpy(value,*((char**)params[i].value + params[i].index));
+    *param = params[i];
+    return ESP_OK;
+}
+
+void BoardParameter::PrintParameter(ParamID id){
+    Parameter_t param; 
+    uint16_t valueNum;
+    if(id > PARAM_STRING_PARAM_OFFSET && id < PARAM_END_PARAM){
+        char s[20] = {0};
+        ESP_ERROR_CHECK(GetParameter(&param,id,s,sizeof(s)));
+        if(param.unit != NULL)
+            ESP_LOGI("PrintParam","KeyName:%s, value:%s, index:%u, maxElement:%d, unit:%s", param.keyName, s, param.index, param.maxValue, param.unit);
+        else 
+            ESP_LOGI("PrintParam","KeyName:%s, value:%s, index:%u, maxElement:%d", param.keyName, s, param.index, param.maxValue);
+    } else {
+        ESP_ERROR_CHECK(GetParameter(&param,id,&valueNum));
+        if(param.unit != NULL)
+            ESP_LOGI("PrintParam","KeyName:%s, value:%d, step:%d, min:%d, max:%d, unit:%s", param.keyName, valueNum, param.stepChange, param.minValue, param.maxValue, param.unit);
+        else
+            ESP_LOGI("PrintParam","KeyName:%s, value:%d, step:%d, min:%d, max:%d", param.keyName, valueNum, param.stepChange, param.minValue, param.maxValue);
+    }
+    
+}
+
+
+
+void BoardParameter::Begin()
+{
+    uint8_t i = 0;
+    brdParam.SetParameter(&params[i], "TotalValve", (void*)&paramInt[i], TYPE_UINT16, PARAM_TOTAL_VALVE, 1, 0, 16, NULL); i++;
+    brdParam.SetParameter(&params[i], "DownTCycle", (void*)&paramInt[i], TYPE_UINT16, PARAM_DOWN_TIME_CYCLE, 1, 0, 32, NULL); i++;
+    brdParam.SetParameter(&params[i], "CleanMode ", (void*)&paramInt[i], TYPE_UINT16, PARAM_ODC_CLEAN_MODE, 1, 1, 5, NULL); i++;
+    brdParam.SetParameter(&params[i], "TestMode  ", (void*)&paramInt[i], TYPE_UINT16, PARAM_TEST_MODE, 1, 0, 7, NULL); i++;
+    brdParam.SetParameter(&params[i], "Contrast  ", (void*)&paramInt[i], TYPE_UINT16, PARAM_DISPLAY_CONTRAST, 5, 10, 200, NULL); i++;
+    brdParam.SetParameter(&params[i], "DP-Low    ", (void*)&paramInt[i], TYPE_UINT16, PARAM_DP_LOW, 50, 250, 4000, "Pa"); i++;
+    brdParam.SetParameter(&params[i], "DP-High   ", (void*)&paramInt[i], TYPE_UINT16, PARAM_DP_HIGH, 50, 250, 4000, "Pa"); i++;
+    brdParam.SetParameter(&params[i], "DP-Alarm  ", (void*)&paramInt[i], TYPE_UINT16, PARAM_DP_WARN, 50, 300, 5000, "Pa"); i++;
+    brdParam.SetParameter(&params[i], "ODC High  ", (void*)&paramInt[i], TYPE_UINT16, PARAM_ODC_HIGH, 50, 250, 4000, "Pa"); i++;
+    brdParam.SetParameter(&params[i], "ODC Low   ", (void*)&paramInt[i], TYPE_UINT16, PARAM_ODC_LOW, 50, 250, 4000, "Pa"); i++;
+    brdParam.SetParameter(&params[i], "Pulse Time", (void*)&paramInt[i], TYPE_UINT16, PARAM_PULSE_TIME, 10, 40, 300, "ms"); i++;
+    brdParam.SetParameter(&params[i], "Inter Time", (void*)&paramInt[i], TYPE_UINT16, PARAM_INTERVAL_TIME, 2, 40, 500, "s"); i++;
+    brdParam.SetParameter(&params[i], "Cycle Time", (void*)&paramInt[i], TYPE_UINT16, PARAM_CYCLE_INTERVAL_TIME, 1, 20, 100, "s"); i++;
+    brdParam.SetParameter(&params[i], "OperHour  ", (void*)&paramInt[i], TYPE_UINT16, PARAM_OPERATE_HOURS, 100, 0, 25000, "h"); i++;
+    brdParam.SetParameter(&params[i], "ServRunH  ", (void*)&paramInt[i], TYPE_UINT16, PARAM_SERV_RUN_HOURS, 100, 0, 25000, "h"); i++;
+    brdParam.SetParameter(&params[i], "ServAlarm ", (void*)&paramInt[i], TYPE_UINT16, PARAM_SERV_RUN_HOURS_ALARM, 100, 0, 25000, "h"); i++;
+    brdParam.SetParameter(&params[i], "Language  ", (void*)&language,    TYPE_STRING, PARAM_LANGUAGE, 0, FindTotalStringArrayElements(sizeof(language)), NULL); i++;
+    brdParam.SetParameter(&params[i], "DispRange ", (void*)&displayRange,TYPE_STRING, PARAM_DISPLAY_RANGE, 0, FindTotalStringArrayElements(sizeof(displayRange)), NULL); i++;
+    brdParam.SetParameter(&params[i], "ParamCode ", (void*)&paramCode,   TYPE_STRING, PARAM_PARAM_CODE, 0, FindTotalStringArrayElements(sizeof(paramCode)), NULL); i++;
+    brdParam.SetParameter(&params[i], "TechCode  ", (void*)&techCode,    TYPE_STRING, PARAM_TECH_CODE, 0, FindTotalStringArrayElements(sizeof(techCode)), NULL); i++;
+    brdParam.SetParameter(&params[i], "DP mode   ", (void*)&DPmode,      TYPE_STRING, PARAM_DP_MODE, 0, FindTotalStringArrayElements(sizeof(DPmode)), NULL); i++;
+    brdParam.SetParameter(&params[i], "TrigValve ", (void*)&triggerValve,TYPE_STRING, PARAM_TRIG_VALVE, 0, FindTotalStringArrayElements(sizeof(triggerValve)), NULL); i++;
+}
+
+
+uint8_t FindTotalStringArrayElements(uint8_t sizeOfAllStringPointer)
+{
+    return sizeOfAllStringPointer/sizeof(char*);
+}
+
+void InitBoardParameter(){
+    brdParam.Begin();
+    brdParam.PrintAllParameter();
+}
+
+void BoardParameter::PrintAllParameter(){
+    for(uint8_t i = PARAM_TOTAL_VALVE; i < PARAM_END_PARAM; i++){
+        if(i == 17) continue;
+        brdParam.PrintParameter((ParamID)i);
+    }
 }
