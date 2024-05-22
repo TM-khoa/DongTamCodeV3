@@ -11,16 +11,14 @@ class StatusLED
 {
 private:
     /* data */
-    uint8_t _bitmask;
+    uint8_t _ledErrorBitmask;
+    uint8_t _ledStatusBitmask;
 public:
+    void Begin(uint32_t ledErrorBitmask, uint32_t ledStatusBitmask);
     // Hàm này cần phải khai báo chân 74HC595 ở PressureBar trước khi sử dụng vì class này không có method khởi tạo và chọn chân 74HC595
-    void Write(bool on);
-StatusLED(uint8_t bitmask);
+    void OutputStatusLED(bool on);
+    void OutputErrorLED(bool on);
+    void Test(uint8_t blinkNum, uint16_t delay);
 
 };
-
-
-
-void TestLedStatus(StatusLED ledError, StatusLED ledStatus, uint8_t blinkNum, uint16_t delay);
-
 #endif

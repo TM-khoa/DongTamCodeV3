@@ -12,6 +12,16 @@ typedef enum DataType{
     TYPE_STRING,
 }DataType;
 
+typedef enum ParametersEvent{
+    PARAM_EVT_WRITE_PARAMS_TO_FLASH,
+    PARAM_EVT_GET_PARAMS_FROM_FLASH,
+    PARAM_EVT_VALUE_REACH_LIMIT,
+    PARAM_EVT_REFRESH_DISPLAY,
+    PARAM_EVT_INCREASE_VALUE,
+    PARAM_EVT_DECREASE_VALUE,
+    PARAM_EVT_RESET_LCD,
+}ParametersEvent;
+
 typedef enum ParamID{
     PARAM_START_PARAM,
     // unit is none
@@ -81,10 +91,6 @@ public:
     esp_err_t GetParameter(Parameter_t *param, ParamID id, uint16_t *value);
     esp_err_t GetParameter(Parameter_t *param, ParamID id, char *value, uint16_t sizeOfOutputString);
 };
-
-
-uint8_t FindTotalStringArrayElements(uint8_t sizeOfAllStringPointer);
-
 void InitBoardParameter();
 
 #endif /*__BOARD_PARAMETER_H__*/

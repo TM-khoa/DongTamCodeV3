@@ -7,6 +7,11 @@
 #include "sdkconfig.h"
 #include "freertos/queue.h"
 
+#define SHIFT_BIT_LEFT(STEP) (1UL << (STEP))
+#define CHECKFLAG(FlagGroup,FlagBit) ((((FlagGroup) & (1UL << FlagBit)) == (1UL << FlagBit)) ? 1 : 0)
+#define SETFLAG(FlagGroup,FlagBit) ((FlagGroup) |= (1UL << FlagBit))
+#define CLEARFLAG(FlagGroup,FlagBit) (FlagGroup &= ~(1UL << FlagBit))
+
 #define CONFIG_USE_74HC595
 #define CONFIG_USE_PCF8574
 #define CONFIG_USE_I2CDEV

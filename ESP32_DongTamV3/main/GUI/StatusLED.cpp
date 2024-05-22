@@ -1,43 +1,35 @@
 #include "StatusLED.h"
 
-StatusLED::StatusLED(uint8_t bitmask)
-{
-    _bitmask = bitmask;
+void StatusLED::Begin(uint32_t ledErrorBitmask, uint32_t ledStatusBitmask){
+    _ledErrorBitmask = ledErrorBitmask;
+    _ledStatusBitmask = ledStatusBitmask;
 }
 
-void StatusLED::Write(bool on)
+void StatusLED::OutputStatusLED(bool on)
 {
-    if(on) HC595_SetBitOutput(_bitmask);
-    else HC595_ClearBitOutput(_bitmask);
+    if(on) HC595_SetBitOutput(_ledStatusBitmask);
+    else HC595_ClearBitOutput(_ledStatusBitmask);
 }
 
-void TestLedStatus(StatusLED ledError, StatusLED ledStatus, uint8_t blinkNum, uint16_t delay)
+void StatusLED::OutputErrorLED(bool on)
 {
-    for(uint8_t i=0;i<blinkNum;i++){
-        ledError.Write(1);
-        HC595_ShiftOut(NULL,2,1);
-        vTaskDelay(delay/portTICK_PERIOD_MS);
-        ledError.Write(0);
-        HC595_ShiftOut(NULL,2,1);
-        vTaskDelay(delay/portTICK_PERIOD_MS);
-    }
-    for(uint8_t i=0;i<blinkNum;i++){
-        ledStatus.Write(1);
-        HC595_ShiftOut(NULL,2,1);
-        vTaskDelay(delay/portTICK_PERIOD_MS);
-        ledStatus.Write(0);
-        HC595_ShiftOut(NULL,2,1);
-        vTaskDelay(delay/portTICK_PERIOD_MS);
-        
-    }
-    for(uint8_t i=0;i<blinkNum;i++){
-        ledStatus.Write(1);
-        ledError.Write(1);
-        HC595_ShiftOut(NULL,2,1);
-        vTaskDelay(delay/portTICK_PERIOD_MS);
-        ledStatus.Write(0);
-        ledError.Write(0);
-        HC595_ShiftOut(NULL,2,1);
-        vTaskDelay(delay/portTICK_PERIOD_MS);
+    if(on) HC595_SetBitOutput(_ledErrorBitmask);
+    else HC595_ClearBitOutput(_ledErrorBitmask);
+}
+
+void StatusLED::Test(uint8_t blinkNum, uint16_t delay)
+{
+    for(uint8_t j = 0; j < 2; j++){
+        for(uint8_t i = 0; i < blinkNum; i++){
+            OutputErrorLED(1);
+            OutputStatusLED(0);
+            HC595_ShiftOut(NULL,2,1);
+            vTaskDelay(delay/portTICK_PERIOD_MS);
+            OutputErrorLED(0);
+            OutputStatusLED(1);
+            HC595_ShiftOut(NULL,2,1);
+            vTaskDelay((delay)/portTICK_PERIOD_MS);
+        }
+        vTaskDelay(500/portTICK_PERIOD_MS);
     }
 }

@@ -1,4 +1,6 @@
 #include "BoardParameter.h"
+uint8_t FindTotalStringArrayElements(uint8_t sizeOfAllStringPointer);
+
 
 const char *language[] = {
     "Eng",
@@ -62,6 +64,11 @@ uint16_t paramInt[]= {
 Parameter_t params[22];
 BoardParameter brdParam;
 
+/**
+ * @brief Cho biết với mã id thông số tương ứng với thứ tự phần tử nào của mảng params
+ * @param id 
+ * @return phần tử nào của mảng params có mã id khớp với mã id đã cho
+ */
 uint8_t GetIndexFromParamID(ParamID id){
     uint8_t i = 0;
     uint8_t numOfParamElement = sizeof(params) / sizeof(Parameter_t);
@@ -70,10 +77,6 @@ uint8_t GetIndexFromParamID(ParamID id){
     }
     return 255;
 }
-
-
-
-
 
 void BoardParameter::SetParameter(Parameter_t *param, const char* keyName, void* value, DataType dataType, ParamID id, uint8_t stepChange, uint16_t minValue, uint16_t maxValue,const char* unit){
     param->keyName = keyName;
@@ -99,7 +102,10 @@ void BoardParameter::SetParameter(Parameter_t *param, const char* keyName, void*
     // ESP_LOGI("SetParam","id:%d,dataType:%d",id,param->dataType);
 }
 
-
+/**
+ * @brief Tăng một đơn vị giá trị của thông số với id đã cho
+ * @param id 
+ */
 void BoardParameter::IncreaseNextValue(ParamID id){
     uint8_t i = 0;
     if(id != preID) {
@@ -110,31 +116,31 @@ void BoardParameter::IncreaseNextValue(ParamID id){
     switch(dataType){
         case TYPE_UINT8:{
             uint8_t *a = (uint8_t*)params[i].value;
-            *a += params[i].stepChange;
             if(*a >= params[i].maxValue) *a = params[i].maxValue;
+            else *a += params[i].stepChange;
         }
         break;
         case TYPE_UINT16:{
             uint16_t *a = (uint16_t*)params[i].value;
-            *a += params[i].stepChange;
             if(*a >= params[i].maxValue) *a = params[i].maxValue;
+            else *a += params[i].stepChange;
         }
         break;
         case TYPE_UINT32:{
             uint32_t *a = (uint32_t*)params[i].value;
-            *a += params[i].stepChange;
             if(*a >= params[i].maxValue) *a = params[i].maxValue;
+            else *a += params[i].stepChange;
         }
         break;
         case TYPE_FLOAT:{
             float *a = (float*)params[i].value;
-            *a += params[i].stepChange;
             if(*a >= params[i].maxValue) *a = params[i].maxValue;
+            else *a += params[i].stepChange;
         }
         break;
         case TYPE_STRING:{
-            params[i].index++;
             if(params[i].index >= params[i].maxValue) params[i].index = params[i].maxValue;
+            else params[i].index++;
         }
         break;
         default:
@@ -142,6 +148,11 @@ void BoardParameter::IncreaseNextValue(ParamID id){
     }
     
 }
+
+/**
+ * @brief Giảm một đơn vị giá trị của thông số với id đã cho
+ * @param id 
+ */
 void BoardParameter::DecreasePreviousValue(ParamID id){
     uint8_t i = 0;
     if(id != preID) {
@@ -152,31 +163,32 @@ void BoardParameter::DecreasePreviousValue(ParamID id){
     switch(dataType){
         case TYPE_UINT8:{
             uint8_t *a = (uint8_t*)params[i].value;
-            *a -= params[i].stepChange;
             if(*a <= params[i].minValue) *a = params[i].minValue;
+            else *a -= params[i].stepChange;
         }
         break;
         case TYPE_UINT16:{
             uint16_t *a = (uint16_t*)params[i].value;
-            *a -= params[i].stepChange;
             if(*a <= params[i].minValue) *a = params[i].minValue;
+            else *a -= params[i].stepChange;
         }
         break;
         case TYPE_UINT32:{
             uint32_t *a = (uint32_t*)params[i].value;
-            *a -= params[i].stepChange;
             if(*a <= params[i].minValue) *a = params[i].minValue;
+            else *a -= params[i].stepChange;
         }
         break;
         case TYPE_FLOAT:{
             float *a = (float*)params[i].value;
-            *a -= params[i].stepChange;
             if(*a <= params[i].minValue) *a = params[i].minValue;
+            else *a -= params[i].stepChange;
         }
         break;
         case TYPE_STRING:{
-            params[i].index--;
-            if(params[i].index <= 0) params[i].index = 0;
+            // vì index là số nguyên dương nên khi 0 - 1 sẽ ra số dương max, do đó thêm điều kiện lớn hơn max index
+            if(params[i].index == 0 || params[i].index > params[i].maxValue - 1) params[i].index = 0;
+            else params[i].index--;
         }
         break;
         default:
@@ -204,7 +216,7 @@ esp_err_t BoardParameter::GetParameter(Parameter_t *param, ParamID id, char *val
         i = GetIndexFromParamID(id);
         preID = id;
     }
-    // ESP_LOGI("GetParam","i:%u,id:%d,dataType:%d",i,id,params[i].dataType);
+    ESP_LOGI("GetParam","i:%u,id:%d,dataType:%d",i,id,params[i].dataType);
     if(params[i].dataType != TYPE_STRING) return ESP_ERR_INVALID_ARG;
     // if(strlen((const char*)*(params[i].value + params[i].index)) > sizeOfOutputString) return ESP_ERR_INVALID_ARG;
     /**
@@ -221,7 +233,7 @@ void BoardParameter::PrintParameter(ParamID id){
     Parameter_t param; 
     uint16_t valueNum;
     if(id > PARAM_STRING_PARAM_OFFSET && id < PARAM_END_PARAM){
-        char s[20] = {0};
+        char s[10] = {0};
         ESP_ERROR_CHECK(GetParameter(&param,id,s,sizeof(s)));
         if(param.unit != NULL)
             ESP_LOGI("PrintParam","KeyName:%s, value:%s, index:%u, maxElement:%d, unit:%s", param.keyName, s, param.index, param.maxValue, param.unit);
@@ -236,8 +248,6 @@ void BoardParameter::PrintParameter(ParamID id){
     }
     
 }
-
-
 
 void BoardParameter::Begin()
 {
@@ -266,7 +276,6 @@ void BoardParameter::Begin()
     brdParam.SetParameter(&params[i], "TrigValve ", (void*)&triggerValve,TYPE_STRING, PARAM_TRIG_VALVE, 0, FindTotalStringArrayElements(sizeof(triggerValve)), NULL); i++;
 }
 
-
 uint8_t FindTotalStringArrayElements(uint8_t sizeOfAllStringPointer)
 {
     return sizeOfAllStringPointer/sizeof(char*);
@@ -274,6 +283,10 @@ uint8_t FindTotalStringArrayElements(uint8_t sizeOfAllStringPointer)
 
 void InitBoardParameter(){
     brdParam.Begin();
+    brdParam.IncreaseNextValue(PARAM_TOTAL_VALVE);
+    brdParam.IncreaseNextValue(PARAM_DISPLAY_RANGE);
+    brdParam.IncreaseNextValue(PARAM_DP_LOW);
+    brdParam.DecreasePreviousValue(PARAM_LANGUAGE);
     brdParam.PrintAllParameter();
 }
 
