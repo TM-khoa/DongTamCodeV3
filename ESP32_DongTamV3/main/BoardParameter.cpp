@@ -41,6 +41,7 @@ const char *triggerValve[] = {
 };
 
 ParamID preID;
+uint8_t indexID = 0;
 
 uint16_t paramInt[]= {
     0,//total
@@ -198,53 +199,79 @@ void BoardParameter::DecreasePreviousValue(ParamID id){
 }
 
 esp_err_t BoardParameter::GetParameter(Parameter_t *param, ParamID id, uint16_t *value){
-    uint8_t i = 0;
     if(id != preID) {
-        i = GetIndexFromParamID(id);
+        indexID = GetIndexFromParamID(id);
         preID = id;
     }
-    // ESP_LOGI("GetParam","i:%u,id:%d,dataType:%d",i,id,params[i].dataType);
-    if(params[i].dataType != TYPE_UINT16) return ESP_ERR_INVALID_ARG;
-    *value = *(uint16_t*)params[i].value;
-    *param = params[i];
+    ESP_LOGI("GetParam","indexID:%u, id:%d, dataType:%d",indexID, id, params[indexID].dataType);
+    if(params[indexID].dataType != TYPE_UINT16) return ESP_ERR_INVALID_ARG;
+    if(value != NULL) *value = *(uint16_t*)params[indexID].value;
+    *param = params[indexID];
     return ESP_OK;
 }
 
-esp_err_t BoardParameter::GetParameter(Parameter_t *param, ParamID id, char *value, uint16_t sizeOfOutputString){
-    uint8_t i = 0;
+esp_err_t BoardParameter::GetParameter(Parameter_t **pParam, ParamID id){
     if(id != preID) {
-        i = GetIndexFromParamID(id);
+        indexID = GetIndexFromParamID(id);
         preID = id;
     }
-    ESP_LOGI("GetParam","i:%u,id:%d,dataType:%d",i,id,params[i].dataType);
-    if(params[i].dataType != TYPE_STRING) return ESP_ERR_INVALID_ARG;
-    // if(strlen((const char*)*(params[i].value + params[i].index)) > sizeOfOutputString) return ESP_ERR_INVALID_ARG;
+    ESP_LOGI("GetParam","indexID:%u, id:%d, dataType:%d",indexID, id, params[indexID].dataType);
+    *pParam = params + indexID;
+    return ESP_OK;
+}
+
+esp_err_t BoardParameter::GetParameter(Parameter_t *param, ParamID id, const char **value){
+    if(id != preID) {
+        indexID = GetIndexFromParamID(id);
+        preID = id;
+    }
+    ESP_LOGI("GetParam","indexID:%u, id:%d, dataType:%d",indexID, id, params[indexID].dataType);
+    if(params[indexID].dataType != TYPE_STRING) return ESP_ERR_INVALID_ARG;
     /**
      * Con trỏ void* mà params.value đang trỏ tới là con trỏ cấp hai **s trỏ tới mảng chuỗi (con trỏ cấp một là trỏ tới chuỗi)
      * Do đó cần phải ép kiểu về con trỏ cấp hai trước ((char**)s + i)(với i là phần tử thứ i của mảng chuỗi), 
      * sau đó lấy giá trị *(s + i) là giá trị của phần tử thuộc mảng chuỗi (hay chính là chuỗi - con trỏ cấp một)
     */ 
-    strcpy(value,*((char**)params[i].value + params[i].index));
-    *param = params[i];
+    *value = *((const char**)params[indexID].value + params[indexID].index);
+    *param = params[indexID];
     return ESP_OK;
 }
 
 void BoardParameter::PrintParameter(ParamID id){
     Parameter_t param; 
-    uint16_t valueNum;
     if(id > PARAM_STRING_PARAM_OFFSET && id < PARAM_END_PARAM){
-        char s[10] = {0};
-        ESP_ERROR_CHECK(GetParameter(&param,id,s,sizeof(s)));
+        const char *s = NULL;
+        ESP_ERROR_CHECK(GetParameter(&param,id,&s));
         if(param.unit != NULL)
             ESP_LOGI("PrintParam","KeyName:%s, value:%s, index:%u, maxElement:%d, unit:%s", param.keyName, s, param.index, param.maxValue, param.unit);
         else 
             ESP_LOGI("PrintParam","KeyName:%s, value:%s, index:%u, maxElement:%d", param.keyName, s, param.index, param.maxValue);
     } else {
+        uint16_t valueNum = 0;
         ESP_ERROR_CHECK(GetParameter(&param,id,&valueNum));
         if(param.unit != NULL)
             ESP_LOGI("PrintParam","KeyName:%s, value:%d, step:%d, min:%d, max:%d, unit:%s", param.keyName, valueNum, param.stepChange, param.minValue, param.maxValue, param.unit);
         else
             ESP_LOGI("PrintParam","KeyName:%s, value:%d, step:%d, min:%d, max:%d", param.keyName, valueNum, param.stepChange, param.minValue, param.maxValue);
+    }
+    
+}
+
+
+void BoardParameter::PrintParameter(Parameter_t param)
+{
+    if(param.dataType == TYPE_STRING){
+        const char *s = *((const char**)param.value + param.index);
+        if(param.unit != NULL)
+            ESP_LOGI("PrintParam","KeyName:%s, value:%s, index:%u, maxElement:%d, unit:%s", param.keyName, s, param.index, param.maxValue, param.unit);
+        else 
+            ESP_LOGI("PrintParam","KeyName:%s, value:%s, index:%u, maxElement:%d", param.keyName, s, param.index, param.maxValue);
+    } else {
+        uint16_t *valueNum = (uint16_t*)param.value;
+        if(param.unit != NULL)
+            ESP_LOGI("PrintParam","KeyName:%s, value:%d, step:%d, min:%d, max:%d, unit:%s", param.keyName, *valueNum, param.stepChange, param.minValue, param.maxValue, param.unit);
+        else
+            ESP_LOGI("PrintParam","KeyName:%s, value:%d, step:%d, min:%d, max:%d", param.keyName, *valueNum, param.stepChange, param.minValue, param.maxValue);
     }
     
 }

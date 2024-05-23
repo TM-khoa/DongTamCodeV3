@@ -16,7 +16,8 @@ typedef enum ParametersEvent{
     PARAM_EVT_WRITE_PARAMS_TO_FLASH,
     PARAM_EVT_GET_PARAMS_FROM_FLASH,
     PARAM_EVT_VALUE_REACH_LIMIT,
-    PARAM_EVT_REFRESH_DISPLAY,
+    PARAM_EVT_REFRESH_NEXT_PARAMS_DISPLAY,
+    PARAM_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY,
     PARAM_EVT_INCREASE_VALUE,
     PARAM_EVT_DECREASE_VALUE,
     PARAM_EVT_RESET_LCD,
@@ -85,11 +86,13 @@ public:
     void SetParameter(Parameter_t *param, const char* keyName, void* value, DataType dataType, ParamID id, uint8_t stepChange, uint16_t minValue, uint16_t maxValue,const char* unit);
     void SetParameter(Parameter_t *param, const char* keyName, void* value, DataType dataType, ParamID id, uint8_t index, uint8_t maxElement,const char* unit);
     void PrintParameter(ParamID id);
+    void PrintParameter(Parameter_t param);
     void PrintAllParameter();
     void IncreaseNextValue(ParamID id);
     void DecreasePreviousValue(ParamID id);
     esp_err_t GetParameter(Parameter_t *param, ParamID id, uint16_t *value);
-    esp_err_t GetParameter(Parameter_t *param, ParamID id, char *value, uint16_t sizeOfOutputString);
+    esp_err_t GetParameter(Parameter_t **pParam, ParamID id);
+    esp_err_t GetParameter(Parameter_t *param, ParamID id, const char **value);
 };
 void InitBoardParameter();
 
