@@ -162,13 +162,15 @@ public:
         // Nếu đạt tới giới hạn index thì không cho phép thay đổi hàng
         if(_paramDisplayIndex >= _maxDisplayParamIndex - 1) {
             _paramDisplayIndex = _maxDisplayParamIndex - 1;
+            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_REFRESH_NEXT_PARAMS_DISPLAY));
             return;
         }
         else _paramDisplayIndex++;
         // ở hàng dưới cùng thì quay về đầu trên cùng
         if(_py >= LCD_ROWS - 1) {
             _py = 0;
-            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_REFRESH_DISPLAY));
+            // Sự kiện yêu cầu load 4 thông số tiếp theo (từ hàng đầu tiên load xuống hàng cuối cùng) tính từ _paramDisplayIndex hiện tại
+            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_REFRESH_NEXT_PARAMS_DISPLAY));
         }
         else _py++;// tăng dần số hàng (con trỏ di chuyển xuống dưới màn hình)
     }
@@ -187,7 +189,8 @@ public:
         // ở hàng trên cùng thì quay về hàng dưới cùng
         if(_py == 0) {
             _py = LCD_ROWS - 1;
-            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_REFRESH_DISPLAY));
+            // Sự kiện yêu cầu load 4 thông số trước đó (từ hàng dưới cùng load lên hàng đầ tiên) tính từ _paramDisplayIndex hiện tại
+            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY));
         }
         else _py--;//còn không thì giảm dần y (con trỏ di chuyển lên phía trên màn hình)
     }

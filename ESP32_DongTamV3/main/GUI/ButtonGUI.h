@@ -179,7 +179,6 @@ private:
         .intr_type = GPIO_INTR_DISABLE,
         };
         _taskHandleGUI = taskHandleGUI;
-        ESP_LOGW("BtnBegin","%p",_taskHandleGUI);
         return gpio_config(&cfg);
     }
         
