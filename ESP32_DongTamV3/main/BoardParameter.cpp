@@ -65,6 +65,9 @@ uint16_t paramInt[]= {
 Parameter_t params[22];
 BoardParameter brdParam;
 
+
+
+
 /**
  * @brief Cho biết với mã id thông số tương ứng với thứ tự phần tử nào của mảng params
  * @param id 
@@ -91,6 +94,7 @@ void BoardParameter::SetParameter(Parameter_t *param, const char* keyName, void*
     // ESP_LOGI("SetParam","id:%d,dataType:%d",id,param->dataType);
 
 }
+
 
 void BoardParameter::SetParameter(Parameter_t *param, const char* keyName, void* value, DataType dataType, ParamID id, uint8_t index, uint8_t maxElement,const  char* unit)
 {
@@ -198,61 +202,49 @@ void BoardParameter::DecreasePreviousValue(ParamID id){
     
 }
 
-esp_err_t BoardParameter::GetParameter(Parameter_t *param, ParamID id, uint16_t *value){
-    if(id != preID) {
-        indexID = GetIndexFromParamID(id);
-        preID = id;
-    }
-    ESP_LOGI("GetParam","indexID:%u, id:%d, dataType:%d",indexID, id, params[indexID].dataType);
-    if(params[indexID].dataType != TYPE_UINT16) return ESP_ERR_INVALID_ARG;
-    if(value != NULL) *value = *(uint16_t*)params[indexID].value;
-    *param = params[indexID];
-    return ESP_OK;
-}
-
+/**
+ * @brief Lấy thông số có mã ID từ bảng thông số
+ * @note Bắt buộc phải đưa vào địa chỉ của con trỏ cấp 1 thì mới lấy được thông tin trả về. Ví dụ Parameter_t *param. 
+ * BoardParameter::GetParameter(&param, ParamID id)
+ * 
+ * @param pParam Địa chỉ của con trỏ cấp 1 chứa thông tin thông số
+ * @param id mã định danh thông số
+ * @return 
+ */
 esp_err_t BoardParameter::GetParameter(Parameter_t **pParam, ParamID id){
     if(id != preID) {
         indexID = GetIndexFromParamID(id);
         preID = id;
     }
+    if(indexID == 255) return ESP_ERR_NOT_FOUND;
     ESP_LOGI("GetParam","indexID:%u, id:%d, dataType:%d",indexID, id, params[indexID].dataType);
     *pParam = params + indexID;
     return ESP_OK;
 }
 
-esp_err_t BoardParameter::GetParameter(Parameter_t *param, ParamID id, const char **value){
-    if(id != preID) {
-        indexID = GetIndexFromParamID(id);
-        preID = id;
-    }
-    ESP_LOGI("GetParam","indexID:%u, id:%d, dataType:%d",indexID, id, params[indexID].dataType);
-    if(params[indexID].dataType != TYPE_STRING) return ESP_ERR_INVALID_ARG;
-    /**
-     * Con trỏ void* mà params.value đang trỏ tới là con trỏ cấp hai **s trỏ tới mảng chuỗi (con trỏ cấp một là trỏ tới chuỗi)
-     * Do đó cần phải ép kiểu về con trỏ cấp hai trước ((char**)s + i)(với i là phần tử thứ i của mảng chuỗi), 
-     * sau đó lấy giá trị *(s + i) là giá trị của phần tử thuộc mảng chuỗi (hay chính là chuỗi - con trỏ cấp một)
-    */ 
-    *value = *((const char**)params[indexID].value + params[indexID].index);
-    *param = params[indexID];
-    return ESP_OK;
+
+
+void* BoardParameter::GetValueAddress(ParamID id){
+    indexID = GetIndexFromParamID(id);
+    return params[indexID].value;
 }
 
 void BoardParameter::PrintParameter(ParamID id){
-    Parameter_t param; 
+    Parameter_t *param; 
     if(id > PARAM_STRING_PARAM_OFFSET && id < PARAM_END_PARAM){
-        const char *s = NULL;
-        ESP_ERROR_CHECK(GetParameter(&param,id,&s));
-        if(param.unit != NULL)
-            ESP_LOGI("PrintParam","KeyName:%s, value:%s, index:%u, maxElement:%d, unit:%s", param.keyName, s, param.index, param.maxValue, param.unit);
+        ESP_ERROR_CHECK(GetParameter(&param,id));
+        const char *s = *((const char**)param->value + param->index);
+        if(param->unit != NULL)
+            ESP_LOGI("PrintParam","KeyName:%s, value:%s, index:%u, maxElement:%d, unit:%s", param->keyName, s, param->index, param->maxValue, param->unit);
         else 
-            ESP_LOGI("PrintParam","KeyName:%s, value:%s, index:%u, maxElement:%d", param.keyName, s, param.index, param.maxValue);
+            ESP_LOGI("PrintParam","KeyName:%s, value:%s, index:%u, maxElement:%d", param->keyName, s, param->index, param->maxValue);
     } else {
-        uint16_t valueNum = 0;
-        ESP_ERROR_CHECK(GetParameter(&param,id,&valueNum));
-        if(param.unit != NULL)
-            ESP_LOGI("PrintParam","KeyName:%s, value:%d, step:%d, min:%d, max:%d, unit:%s", param.keyName, valueNum, param.stepChange, param.minValue, param.maxValue, param.unit);
+        ESP_ERROR_CHECK(GetParameter(&param,id));
+        uint16_t *valueNum = (uint16_t*)param->value;
+        if(param->unit != NULL)
+            ESP_LOGI("PrintParam","KeyName:%s, value:%d, step:%d, min:%d, max:%d, unit:%s", param->keyName, *valueNum, param->stepChange, param->minValue, param->maxValue, param->unit);
         else
-            ESP_LOGI("PrintParam","KeyName:%s, value:%d, step:%d, min:%d, max:%d", param.keyName, valueNum, param.stepChange, param.minValue, param.maxValue);
+            ESP_LOGI("PrintParam","KeyName:%s, value:%d, step:%d, min:%d, max:%d", param->keyName, *valueNum, param->stepChange, param->minValue, param->maxValue);
     }
     
 }

@@ -90,9 +90,8 @@ public:
     void PrintAllParameter();
     void IncreaseNextValue(ParamID id);
     void DecreasePreviousValue(ParamID id);
-    esp_err_t GetParameter(Parameter_t *param, ParamID id, uint16_t *value);
     esp_err_t GetParameter(Parameter_t **pParam, ParamID id);
-    esp_err_t GetParameter(Parameter_t *param, ParamID id, const char **value);
+    void* GetValueAddress(ParamID id);
 };
 void InitBoardParameter();
 
