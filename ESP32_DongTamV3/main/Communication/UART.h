@@ -62,11 +62,14 @@ public:
     }
     void WaitForEventUART (){
         
-        if(xQueueReceive(qRxEventSTM32, (void * )&_uartEvent, 0))
+        if(xQueueReceive(qRxEventSTM32, (void * )&_uartEvent, 0)){
             _uartTarget = UART_NUM_2;
-        else if(xQueueReceive(qRxEventLog,(void * )&_uartEvent, 0))
+        }
+        else if(xQueueReceive(qRxEventLog,(void * )&_uartEvent, 0)){
             _uartTarget = UART_NUM_0;
+        }
         else return;
+        
         switch(_uartEvent.type) {
             case UART_DATA:
                 e = xEventGroupGetBits(_evgExtendEventUART);
@@ -77,24 +80,15 @@ public:
                 */
                 if(_uartEvent.size < 120 && CHECKFLAG(e,SHIFT_BIT_LEFT(EVT_UART_OVERSIZE_HW_FIFO)) == false){
                     uint8_t *dtmp = (uint8_t*) malloc(_uartEvent.size + 1);
-                    uart_read_bytes(UART_NUM_2, dtmp, _uartEvent.size, portMAX_DELAY);
-                    ProtocolErrorCode pErrCode = Protocol::DecodeFrameAndCheckCRC(dtmp,_uartEvent.size);
-                    if(pErrCode == PROTOCOL_ERR_OK){
-                        FrameData fd = Protocol::GetFrameDataInfo();
-                        ESP_LOGI("Frame info","payloadLength:%d, GetSet:%d, crc16:%d, ID:%d",fd.payloadLength,fd.getSetFlag,fd.crc16,fd.protocolID);
-                        Protocol::ResetFrame();
-                        free(dtmp);
-                    }
-                    else if(pErrCode == PROTOCOL_ERR_CRC_FAIL){
-                        ESP_LOGE("Frame info","CRC fail");
-                        Protocol::ResetFrame();
-                        free(dtmp);
-                    }
-                    else if(pErrCode == PROTOCOL_ERR_FRAME_ERROR){
-                        ESP_LOGE("Frame info","Frame error");
-                        Protocol::ResetFrame();
-                        free(dtmp);
-                    }
+                    int byteRead = uart_read_bytes(_uartTarget, dtmp, _uartEvent.size, portMAX_DELAY);
+                    // ESP_LOGI("Receive","EventSize:%d",_uartEvent.size);
+                    // for(uint8_t i = 0; i < byteRead; i++){
+                    //     ESP_LOGI("Byte","0x%x",*(dtmp+i));
+                    // }
+                    Protocol::DecodeFrameAndCheckCRC(dtmp,_uartEvent.size);
+                    Protocol::ResetFrame();
+                    ESP_LOGI("Free","Data");
+                    free(dtmp);
 
                 } 
                 else {
