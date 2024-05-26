@@ -2,6 +2,7 @@
 #define __BOARD_PARAMETER_H__
 #include "main.h"
 #include "string.h"
+#include "RTC_Format.h"
 #define LENGTH_OF_PARAM     11 //length of paramText
 
 typedef enum DataType{
@@ -80,7 +81,9 @@ class BoardParameter
 {
 private:
     /* data */
-    uint16_t a;
+    RTC_t _t;
+    float _pressureSP100;
+    float _pressureAMS5915;
 public:
     void Begin();
     void SetParameter(Parameter_t *param, const char* keyName, void* value, DataType dataType, ParamID id, uint8_t stepChange, uint16_t minValue, uint16_t maxValue,const char* unit);
@@ -92,6 +95,16 @@ public:
     void DecreasePreviousValue(ParamID id);
     esp_err_t GetParameter(Parameter_t **pParam, ParamID id);
     void* GetValueAddress(ParamID id);
+
+    void SetRTC(RTC_t t){ _t = t;}
+    void SetPressureSP100(float p){_pressureSP100 = p;}
+    void SetPressureAMS5915(float p){_pressureAMS5915 = p;}
+    RTC_t GetRTC(){ return _t;}
+    float GetPressureSP100(){return _pressureSP100;}
+    float GetPressureAMS5915(){return _pressureAMS5915;}
+
+    RTC_t* GetAddrRTC(){ return &_t;}
+
 };
 void InitBoardParameter();
 
