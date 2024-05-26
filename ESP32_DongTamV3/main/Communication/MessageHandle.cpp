@@ -10,11 +10,14 @@ void ErrorMessage(ProtocolErrorCode err){mesg.HandleErrorMessage(err);}
 void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, ProtocolListID id, GetSetFlag getSetFlag){
     FrameData fd = mesg.GetFrameDataInfo();
     ESP_LOGI("Receive Message", "totalLength:%u,ID:%d,GetSetFlag:%d",fd.totalLength,id,getSetFlag);
-    switch (id){
-    case PROTOCOL_ID_HANDSHAKE:
+
+    if(id == PROTOCOL_ID_HANDSHAKE){
         ESP_LOGI("HandShake","Receive");
-        mesg.SetHandshake(true);
-        break;
+        mesg.SetHandshake(true);   
+    }
+    if(mesg.IsHandshake() == false) return;
+    switch (id){
+    
     case PROTOCOL_ID_VALVE:
         
         break;            

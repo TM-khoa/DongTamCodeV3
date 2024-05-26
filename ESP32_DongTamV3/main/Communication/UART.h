@@ -56,7 +56,8 @@ public:
         ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, UART_BUFFER_EVENT_SIZE, UART_BUFFER_EVENT_SIZE, UART_QUEUE_EVENT_SIZE, &qRxEventLog, 0));
         ESP_ERROR_CHECK(uart_param_config(UART_NUM_0, &uartConfig));
         ESP_ERROR_CHECK(uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-
+        // Ngăn 2 gói tin dính lẫn nhau
+        uart_set_rx_timeout(UART_NUM_2,5);
         qPtrBigSize = xQueueCreate(QUEUE_SIZE_OF_QBIG_SIZE,sizeof(uint8_t*));
         _evgExtendEventUART = xEventGroupCreate();
     }
