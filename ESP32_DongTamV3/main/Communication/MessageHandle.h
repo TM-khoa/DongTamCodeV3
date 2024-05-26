@@ -4,6 +4,10 @@
 #include "Protocol.h"
 #include "UART.h"
 
+typedef struct PressureTwoSensorValue {
+		float sensorAMS5915;
+		float sensorSP100;
+} PressureTwoSensorValue;
 
 class MessageHandle: public PortUART {
 public:
@@ -37,39 +41,27 @@ public:
         free(senderBuffer);
     }
 
-    void HandleReceiveMessage(ProtocolListID id, GetSetFlag getSetFlag){
-        switch (id){
-        case PROTOCOL_ID_HANDSHAKE:
-            ESP_LOGI("HandShake","Receive");
-            break;
-        case PROTOCOL_ID_VALVE:
-            
-            break;            
-        case PROTOCOL_ID_PULSE_TIME:
-            
-            break;
-        case PROTOCOL_ID_INTERVAL_TIME:
-            
-            break;                    
-        case PROTOCOL_ID_CYCLE_INTERVAL_TIME:
-            
-            break;            
-        case PROTOCOL_ID_TOTAL_VALVE:
-            
-            break;   
-        case PROTOCOL_ID_PRESSURE:
-            break;
-        case PROTOCOL_ID_RTC_TIME:
-            break;
-        default:
-            break;
-        }
+    void HandleErrorMessage(ProtocolErrorCode err)
+    {
+        if(_isHandshake == false) return;
+        ESP_LOGE("ErrorMesg","%d",err);
+        esp_restart();
+        while(1);
     }
 
+    PressureTwoSensorValue GetTwoSensorvalue(){return _pressure;}
+    void SetTwoSensorValue(PressureTwoSensorValue p){_pressure = p;}
+
+    void SetHandshake(bool handshake) {_isHandshake = handshake;}
+    bool IsHandshake(){ return _isHandshake;}
 private:
+    uint16_t handshakeCode = 0;
+    bool _isHandshake;
+    PressureTwoSensorValue _pressure;
 };
 
-void HandleReceivedMessage(ProtocolListID ID, GetSetFlag getSetFlag);
-void HandleErrorMessage(ProtocolErrorCode err);
+void TaskUART(void *pvParameters);
+void ReceivedMessage(ProtocolListID ID, GetSetFlag getSetFlag);
+void ErrorMessage(ProtocolErrorCode err);
 #endif
 

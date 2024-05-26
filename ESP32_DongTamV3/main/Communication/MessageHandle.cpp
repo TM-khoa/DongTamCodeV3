@@ -6,27 +6,70 @@
 MessageHandle mesg;
 extern BoardParameter brdParam;
 
+void ErrorMessage(ProtocolErrorCode err){mesg.HandleErrorMessage(err);}
+void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, ProtocolListID id, GetSetFlag getSetFlag){
+    FrameData fd = mesg.GetFrameDataInfo();
+    ESP_LOGI("Receive Message", "totalLength:%u,ID:%d,GetSetFlag:%d",fd.totalLength,id,getSetFlag);
+    switch (id){
+    case PROTOCOL_ID_HANDSHAKE:
+        ESP_LOGI("HandShake","Receive");
+        mesg.SetHandshake(true);
+        break;
+    case PROTOCOL_ID_VALVE:
+        
+        break;            
+    case PROTOCOL_ID_PULSE_TIME:
+        
+        break;
+    case PROTOCOL_ID_INTERVAL_TIME:
+        
+        break;                    
+    case PROTOCOL_ID_CYCLE_INTERVAL_TIME:
+        
+        break;            
+    case PROTOCOL_ID_TOTAL_VALVE:
+        
+        break;   
+    case PROTOCOL_ID_PRESSURE:
+    {
+        if(getSetFlag == SET_DATA_TO_THIS_DEVICE){         
+            mesg.GetValueFromPayload(inputBuffer,sizeOfInputBuffer);
+            PressureTwoSensorValue p = mesg.GetTwoSensorvalue();
+            brdParam.SetPressureAMS5915(p.sensorAMS5915);
+            brdParam.SetPressureSP100(p.sensorSP100);
+            ESP_LOGI("Pressure","AMS5915:%.2f, SP100:%.2f",p.sensorAMS5915,p.sensorSP100);
+        }
+    }
+        break;
+    case PROTOCOL_ID_RTC_TIME:
+    {
+        if(getSetFlag == SET_DATA_TO_THIS_DEVICE){
+            mesg.GetValueFromPayload(inputBuffer,sizeOfInputBuffer);
+            RTC_t t = brdParam.GetRTC();
+            ESP_LOGI("RTC","h:%u, m:%u, s:%u, d:%u, mth:%u, y:%u",t.hour,t.minute,t.second,t.day,t.month,t.year);
+        }
+    }
+        break;
+    default:
+        break;
+    }
+}
+
 void MessageHandle::Begin(){
     RegisterArgument(brdParam.GetValueAddress(PARAM_TOTAL_VALVE),sizeof(uint16_t),PROTOCOL_ID_TOTAL_VALVE);
-    RegisterReceivedCallbackEvent(&HandleReceivedMessage);
-    RegisterErrorEvent(&HandleErrorMessage);
+    RegisterArgument((void*)&_pressure,sizeof(PressureTwoSensorValue),PROTOCOL_ID_PRESSURE);
+    RegisterArgument((void*)brdParam.GetAddrRTC(),sizeof(RTC_t),PROTOCOL_ID_RTC_TIME);
+    RegisterArgument((void*)&handshakeCode, 0, PROTOCOL_ID_HANDSHAKE);
+    RegisterReceivedCallbackEvent(&HandleReceiveMessage);
+    RegisterErrorEvent(&ErrorMessage);
 }
 
 
 
-void HandleErrorMessage(ProtocolErrorCode err)
-{
-    ESP_LOGE("ErrMesg","%d",err);
-    while(1);
-}
-
-void HandleReceivedMessage(ProtocolListID id, GetSetFlag getSetFlag)
-{
-    mesg.HandleReceiveMessage(id,getSetFlag);
-}
 
 void TaskUART(void *pvParameters)
 {
+    mesg.Begin();
     while(1){
         mesg.WaitForEventUART();
         vTaskDelay(10/portTICK_PERIOD_MS);

@@ -8,6 +8,8 @@
 #ifndef INC_CRC16_H_
 #define INC_CRC16_H_
 
+#include "../main.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
