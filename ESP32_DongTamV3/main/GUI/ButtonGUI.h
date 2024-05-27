@@ -80,19 +80,19 @@ private:
                 xTaskNotify(_taskHandleGUI,e,eSetValueWithoutOverwrite);
             }
         }
-        // /** Button MENU should be handle to reset LCD if it is error
-        //  * Khi nhấn giữ 5s nút Menu thì sẽ reset LCD nếu bị lỗi hiển thị
-        //  * */ 
-        // else if(gpio == BTN_MENU){
-        //     vTaskDelay(1000/portTICK_PERIOD_MS);
-        //     ESP_LOGI("Holding Menu","%u",resetWhenErrorLCD_Count);
-        //     resetWhenErrorLCD_Count++;
-        //     // Wait for 5 seconds or above to send notify 
-        //     if(resetWhenErrorLCD_Count >= 5){
-        //         xTaskNotify(_taskHandleGUI,EVT_LCD_RESET,eSetValueWithoutOverwrite);
-        //         resetWhenErrorLCD_Count = 0;
-        //     }
-        // }
+         /** Button MENU should be handle to reset LCD if it is error
+          * Khi nhấn giữ 5s nút Menu thì sẽ reset LCD nếu bị lỗi hiển thị  
+          * @note Lưu ý không được để ESP_LOGI trong này, nếu không LCD sẽ bị lỗi ghi I2C vào PCF8574  (dự đoán có thể do tràn stack)
+          * */ 
+        else if(gpio == BTN_MENU){
+            vTaskDelay(1000/portTICK_PERIOD_MS);
+            resetWhenErrorLCD_Count++;
+            // Wait for 5 seconds or above to send notify 
+            if(resetWhenErrorLCD_Count >= 5){
+                xTaskNotify(_taskHandleGUI,EVT_LCD_RESET,eSetValueWithoutOverwrite);
+                resetWhenErrorLCD_Count = 0;
+            }
+        }
         else {
             // button SET are nothing to hanle, just delay and return
             vTaskDelay(100/portTICK_PERIOD_MS);
@@ -137,7 +137,7 @@ private:
         if(!gpio_get_level(gpio)){
             vTaskDelay(100/portTICK_PERIOD_MS);
             while(!gpio_get_level(gpio)){
-                    DoThingWhenHoldingButton(gpio,e);
+                DoThingWhenHoldingButton(gpio,e);
             } 
             DoThingWhenHoldingButton(gpio,0);
             xTaskNotify(_taskHandleGUI,e,eSetValueWithoutOverwrite);
