@@ -26,7 +26,7 @@ extern "C" void app_main(void)
     TaskHandle_t *taskHandleGUI = GUI_GetTaskHandle();
     xTaskCreate(TaskManageGUI, "TaskGUI", 4096, NULL, 2, taskHandleGUI);
     xTaskCreate(TaskScanButton,"TaskBtnGUI",1024,NULL,1,NULL);
-    xTaskCreate(TaskUART,"TaskUART",2048,NULL,3,NULL);
+    xTaskCreate(TaskUART,"TaskUART",3072,NULL,3,NULL);
     while(1){
         vTaskDelay(10/portTICK_PERIOD_MS);
     }
