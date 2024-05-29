@@ -43,11 +43,24 @@ typedef enum PointerNow{
 typedef enum Page{
     PAGE_START,
     PAGE_SETTING,
-    PAGE_CONTROL,
     PAGE_RUN,
+    // PAGE_CONTROL,
     PAGE_END,
 }Page; 
 
+
+typedef enum ParametersEvent{
+    GUI_EVT_WRITE_PARAMS_TO_FLASH,
+    GUI_EVT_GET_PARAMS_FROM_FLASH,
+    GUI_EVT_VALUE_REACH_LIMIT,
+    GUI_EVT_REFRESH_NEXT_PARAMS_DISPLAY,
+    GUI_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY,
+    GUI_EVT_INCREASE_VALUE,
+    GUI_EVT_DECREASE_VALUE,
+    GUI_EVT_RESET_LCD,
+    GUI_EVT_NEXT_PAGE,
+    GUI_EVT_UPDATE_VALUE_FROM_UART,
+}ParametersEvent;
 class GUI_Navigator
 {
 private:
@@ -80,8 +93,8 @@ private:
      */
     void IncreaseValue(){
         EventBits_t e = xEventGroupGetBits(_evgGUI);
-        if(CHECKFLAG(e,SHIFT_BIT_LEFT(PARAM_EVT_VALUE_REACH_LIMIT)) == false) 
-            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_INCREASE_VALUE));
+        if(CHECKFLAG(e,SHIFT_BIT_LEFT(GUI_EVT_VALUE_REACH_LIMIT)) == false) 
+            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_INCREASE_VALUE));
 
     }
 
@@ -90,22 +103,22 @@ private:
      */
     void DecreaseValue(){
         EventBits_t e = xEventGroupGetBits(_evgGUI);
-        if(CHECKFLAG(e,SHIFT_BIT_LEFT(PARAM_EVT_VALUE_REACH_LIMIT)) == false) 
-            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_DECREASE_VALUE));
+        if(CHECKFLAG(e,SHIFT_BIT_LEFT(GUI_EVT_VALUE_REACH_LIMIT)) == false) 
+            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_DECREASE_VALUE));
     }
 
     /**
      * @brief Set bit cờ reset LCD khi lỗi
      */
     void SendEventResetLCD(){
-        xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_RESET_LCD));
+        xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_RESET_LCD));
     }
 
     /**
      * @brief Set bit cờ ghi dữ liệu vào flash
      */
     void SendEventSaveParamsToFlash(){
-        xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_WRITE_PARAMS_TO_FLASH));
+        xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_WRITE_PARAMS_TO_FLASH));
     }
 
 
@@ -162,7 +175,7 @@ public:
         // Nếu đạt tới giới hạn index thì không cho phép thay đổi hàng
         if(_paramDisplayIndex >= _maxDisplayParamIndex - 1) {
             _paramDisplayIndex = _maxDisplayParamIndex - 1;
-            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_REFRESH_NEXT_PARAMS_DISPLAY));
+            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_REFRESH_NEXT_PARAMS_DISPLAY));
             return;
         }
         else _paramDisplayIndex++;
@@ -170,7 +183,7 @@ public:
         if(_py >= LCD_ROWS - 1) {
             _py = 0;
             // Sự kiện yêu cầu load 4 thông số tiếp theo (từ hàng đầu tiên load xuống hàng cuối cùng) tính từ _paramDisplayIndex hiện tại
-            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_REFRESH_NEXT_PARAMS_DISPLAY));
+            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_REFRESH_NEXT_PARAMS_DISPLAY));
         }
         else _py++;// tăng dần số hàng (con trỏ di chuyển xuống dưới màn hình)
     }
@@ -190,13 +203,22 @@ public:
         if(_py == 0) {
             _py = LCD_ROWS - 1;
             // Sự kiện yêu cầu load 4 thông số trước đó (từ hàng dưới cùng load lên hàng đầ tiên) tính từ _paramDisplayIndex hiện tại
-            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY));
+            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY));
         }
         else _py--;//còn không thì giảm dần y (con trỏ di chuyển lên phía trên màn hình)
     }
     // WIP
     void MoveNextPage(){
-        
+        if(_page >= PAGE_END) _page = (Page)(PAGE_START + 1);
+        else {
+            _page = (Page)(_page + 1);
+            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_NEXT_PAGE));
+        }
+        ESP_LOGI("Page","Change to: %d",_page);
+    }
+
+    Page GetCurrentPage() {
+        return _page;
     }
 
     PointerNow GetPointerNow(){
@@ -217,10 +239,12 @@ public:
      */
     void WaitForEvent(EventBits_t e){
         HandleEvent(e,SHIFT_BIT_LEFT(EVT_BTN_MENU),&GUI_Navigator::MoveNextPage,&GUI_Navigator::PointerNowIsKeyword);
-        HandleEvent(e,SHIFT_BIT_LEFT(EVT_BTN_SET),&GUI_Navigator::PointerNowIsValue,&GUI_Navigator::SendEventSaveParamsToFlash);
+        if(_page == PAGE_SETTING){
+            HandleEvent(e,SHIFT_BIT_LEFT(EVT_BTN_SET),&GUI_Navigator::PointerNowIsValue,&GUI_Navigator::SendEventSaveParamsToFlash);
+        }
         HandleEvent(e,SHIFT_BIT_LEFT(EVT_BTN_UP),&GUI_Navigator::MovePreviousParam,&GUI_Navigator::IncreaseValue);
         HandleEvent(e,SHIFT_BIT_LEFT(EVT_BTN_DOWN_RIGHT),&GUI_Navigator::MoveNextParam,&GUI_Navigator::DecreaseValue);
-        HandleEvent(e,SHIFT_BIT_LEFT(EVT_LCD_RESET),&GUI_Navigator::SendEventResetLCD,&GUI_Navigator::SendEventResetLCD);
+        HandleEvent(e,SHIFT_BIT_LEFT(EVT_BTN_LCD_RESET),&GUI_Navigator::SendEventResetLCD,&GUI_Navigator::SendEventResetLCD);
         ESP_LOGI("Navigator","px:%u, py:%u, pNow:%d, iDisplay:%u",_px,_py,_pNow,_paramDisplayIndex);
     }
 };
