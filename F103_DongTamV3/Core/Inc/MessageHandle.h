@@ -19,7 +19,7 @@ typedef struct PressureTwoSensorValue {
 		float sensorSP100;
 } PressureTwoSensorValue;
 
-void HandleMessageCallback(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, ProtocolListID protocolID, GetSetFlag getOrSet);
+void HandleMessageCallback(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, ProtocolListID id, GetSetFlag getSetFlag);
 
 class MessageHandle: public Protocol {
 	private:
@@ -59,6 +59,7 @@ class MessageHandle: public Protocol {
 				FrameData fd = GetFrameDataInfo();
 				memset(_rxBuf, 0, fd.totalLength);
 				Protocol::ResetFrame();
+				pReceive(huart, _rxBuf, 1);
 			}
 		}
 		void Begin(UART_HandleTypeDef *huartESP32, UART_HandleTypeDef *huartLog) {
@@ -96,6 +97,14 @@ class MessageHandle: public Protocol {
 			pSend(_targetUART, _txBuf, fd.totalLength, HAL_MAX_DELAY);
 			Protocol::ResetFrame();
 			memset(_txBuf, 0, fd.totalLength);
+		}
+
+		void SetHandshakeStatus(bool isHandshake) {
+			_isHandShake = isHandshake;
+		}
+
+		bool GetHandshakeStatus() {
+			return _isHandShake;
 		}
 
 }
