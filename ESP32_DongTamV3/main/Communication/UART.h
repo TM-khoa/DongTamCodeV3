@@ -81,14 +81,14 @@ public:
                 */
                 if(_uartEvent.size < 120 && CHECKFLAG(e,SHIFT_BIT_LEFT(EVT_UART_OVERSIZE_HW_FIFO)) == false){
                     uint8_t *dtmp = (uint8_t*) malloc(_uartEvent.size + 1);
-                    int byteRead = uart_read_bytes(_uartTarget, dtmp, _uartEvent.size, portMAX_DELAY);
+                    uart_read_bytes(_uartTarget, dtmp, _uartEvent.size, portMAX_DELAY);
                     // ESP_LOGI("Receive","EventSize:%d",_uartEvent.size);
                     // for(uint8_t i = 0; i < byteRead; i++){
                     //     ESP_LOGI("Byte","0x%x",*(dtmp+i));
                     // }
                     Protocol::DecodeFrameAndCheckCRC(dtmp,_uartEvent.size);
                     Protocol::ResetFrame();
-                    ESP_LOGI("Free","Data");
+                    // ESP_LOGI("Free","Data");
                     free(dtmp);
 
                 } 
@@ -119,6 +119,10 @@ public:
 
     void SetTarget(uart_port_t port){
         _uartTarget = port;
+    }
+    
+    uart_port_t GetPortCurrent(){
+        return _uartTarget;
     }
 
     void SendData(uart_port_t port){
