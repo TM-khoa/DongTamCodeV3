@@ -52,10 +52,11 @@ ADC_HandleTypeDef hadc1;
 
 I2C_HandleTypeDef hi2c1;
 
+IWDG_HandleTypeDef hiwdg;
+
 TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart1;
-UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 uint8_t a[1] = {0};
@@ -68,7 +69,9 @@ uint32_t rtcTick_s = 0;
 uint8_t pressureCount = 0;
 uint8_t rtcCount = 0;
 bool enableGetRTC = false;
-
+bool enableSetRTC = false;
+bool error = false;
+ValveFeedback vf;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -76,9 +79,9 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
-static void MX_USART3_UART_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -120,9 +123,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+	error = 1;
 	if (huart == &huart1) {
 		__HAL_UART_CLEAR_OREFLAG(huart);
-		HAL_UART_Receive_IT(huart, mesg.GetPtrRxBuffer(), 1);
+		__HAL_UART_DISABLE(huart);
+
 	}
 }
 
@@ -166,6 +171,13 @@ void EnableGetRTC() {
 	}
 }
 
+void EnableSetRTC() {
+	if (enableSetRTC) {
+		pcf.WriteTimeRegisters(tPCF8563);
+		enableSetRTC = false;
+	}
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -197,29 +209,36 @@ int main(void) {
 	MX_GPIO_Init();
 	MX_TIM3_Init();
 	MX_USART1_UART_Init();
-	MX_USART3_UART_Init();
 	MX_ADC1_Init();
 	MX_I2C1_Init();
+	MX_IWDG_Init();
 	/* USER CODE BEGIN 2 */
-	HAL_TIM_Base_Start_IT(&htim3);
 	ams.Begin(&hi2c1);
 	pcf.Begin(&hi2c1);
-	HAL_Delay(500);
-	mesg.Begin(&huart1, &huart3);
+	tPCF8563 = pcf.ReadTimeRegisters();
+	mesg.Begin(&huart1, NULL);
 	mesg.RegisterArgument((void*) &tCurrent, sizeof(RTC_t), PROTOCOL_ID_RTC_TIME);
-	HAL_GPIO_WritePin(BlueLED_GPIO_Port, BlueLED_Pin, GPIO_PIN_RESET);
-	HAL_Delay(1000);
-	HAL_GPIO_WritePin(BlueLED_GPIO_Port, BlueLED_Pin, GPIO_PIN_SET);
-	HAL_Delay(1000);
-	HAL_GPIO_WritePin(BlueLED_GPIO_Port, BlueLED_Pin, GPIO_PIN_RESET);
+	vf.GetInputValue();
 	vc.StartValveProcess();
+	HAL_TIM_Base_Start_IT(&htim3);
+	HAL_GPIO_WritePin(BlueLED_GPIO_Port, BlueLED_Pin, GPIO_PIN_SET);
+	HAL_Delay(500);
+	HAL_GPIO_WritePin(BlueLED_GPIO_Port, BlueLED_Pin, GPIO_PIN_RESET);
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1) {
+		HAL_IWDG_Refresh(&hiwdg);
 		vc.ValveProcessRun();
 		EnableGetRTC();
+		EnableSetRTC();
+		if ((huart1.Instance->CR1 & USART_CR1_UE) == 0) {
+			__HAL_UART_ENABLE(&huart1);
+			HAL_UART_Receive_IT(&huart1, mesg.GetPtrRxBuffer(), 1);
+		}
+		if (error) {
+		}
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
@@ -239,9 +258,10 @@ void SystemClock_Config(void) {
 	/** Initializes the RCC Oscillators according to the specified parameters
 	 * in the RCC_OscInitTypeDef structure.
 	 */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_LSI;
 	RCC_OscInitStruct.HSIState = RCC_HSI_ON;
 	RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+	RCC_OscInitStruct.LSIState = RCC_LSI_ON;
 	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
 	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
 		Error_Handler();
@@ -342,6 +362,32 @@ static void MX_I2C1_Init(void) {
 }
 
 /**
+ * @brief IWDG Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_IWDG_Init(void) {
+
+	/* USER CODE BEGIN IWDG_Init 0 */
+
+	/* USER CODE END IWDG_Init 0 */
+
+	/* USER CODE BEGIN IWDG_Init 1 */
+
+	/* USER CODE END IWDG_Init 1 */
+	hiwdg.Instance = IWDG;
+	hiwdg.Init.Prescaler = IWDG_PRESCALER_16;
+	hiwdg.Init.Reload = 2500 - 1;
+	if (HAL_IWDG_Init(&hiwdg) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN IWDG_Init 2 */
+
+	/* USER CODE END IWDG_Init 2 */
+
+}
+
+/**
  * @brief TIM3 Initialization Function
  * @param None
  * @retval None
@@ -410,37 +456,6 @@ static void MX_USART1_UART_Init(void) {
 	/* USER CODE BEGIN USART1_Init 2 */
 
 	/* USER CODE END USART1_Init 2 */
-
-}
-
-/**
- * @brief USART3 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_USART3_UART_Init(void) {
-
-	/* USER CODE BEGIN USART3_Init 0 */
-
-	/* USER CODE END USART3_Init 0 */
-
-	/* USER CODE BEGIN USART3_Init 1 */
-
-	/* USER CODE END USART3_Init 1 */
-	huart3.Instance = USART3;
-	huart3.Init.BaudRate = 115200;
-	huart3.Init.WordLength = UART_WORDLENGTH_8B;
-	huart3.Init.StopBits = UART_STOPBITS_1;
-	huart3.Init.Parity = UART_PARITY_NONE;
-	huart3.Init.Mode = UART_MODE_TX_RX;
-	huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-	huart3.Init.OverSampling = UART_OVERSAMPLING_16;
-	if (HAL_UART_Init(&huart3) != HAL_OK) {
-		Error_Handler();
-	}
-	/* USER CODE BEGIN USART3_Init 2 */
-
-	/* USER CODE END USART3_Init 2 */
 
 }
 
