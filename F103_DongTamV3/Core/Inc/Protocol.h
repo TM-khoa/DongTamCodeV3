@@ -289,7 +289,7 @@ class Protocol {
 			_fd.payloadLength = PROTOCOL_PAYLOAD_LENGTH(_fd.totalLength);
 			_fd.protocolID = (ProtocolListID) *(_pRxBuffer + PROTOCOL_ID_FIELD);
 			_fd.getSetFlag = (GetSetFlag) *(_pRxBuffer + PROTOCOL_GET_SET_FIELD);
-			if (PROTOCOL_TOTAL_LENGTH(_fd.payloadLength) != argID[_fd.protocolID].sizeArgument)
+			if (_fd.payloadLength != argID[_fd.protocolID].sizeArgument)
 				JumpToError(PROTOCOL_ERR_FRAME_ERROR);
 			uint32_t crcNibbleByteMSB = *(_pRxBuffer + PROTOCOL_CRC16_FIELD(_fd.payloadLength)) << 8;
 			uint32_t crcNibbleByteLSB = *(_pRxBuffer + PROTOCOL_CRC16_FIELD(_fd.payloadLength) + 1);
