@@ -1,21 +1,25 @@
 #include "MessageHandle.h"
 #include "../BoardParameter.h"
+#include "../GUI/GUI_Navigator.h"
 #include "UART.h"
 #include "esp_log.h"
 
 MessageHandle mesg;
 extern BoardParameter brdParam;
-
+extern EventGroupHandle_t evgGUI;
 void ErrorMessage(ProtocolErrorCode err){mesg.HandleErrorMessage(err);}
 void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, ProtocolListID id, GetSetFlag getSetFlag){
     FrameData fd = mesg.GetFrameDataInfo();
-    ESP_LOGI("Receive Message", "totalLength:%u,ID:%d,GetSetFlag:%d",fd.totalLength,id,getSetFlag);
+    // ESP_LOGI("Receive Message", "totalLength:%u,ID:%d,GetSetFlag:%d",fd.totalLength,id,getSetFlag);
 
     if(id == PROTOCOL_ID_HANDSHAKE){
-        ESP_LOGI("HandShake","Receive");
+        // ESP_LOGI("HandShake","Receive");
         mesg.SetHandshake(true);   
+    } else if (mesg.IsHandshake() == false) {
+        // ESP_LOGW("HandShake","Send Request");
+        mesg.TransmitMessage(mesg.GetPortCurrent(),PROTOCOL_ID_HANDSHAKE,GET_DATA_FROM_THIS_DEVICE);
+        return;
     }
-    if(mesg.IsHandshake() == false) return;
     switch (id){
     
     case PROTOCOL_ID_VALVE:
@@ -56,6 +60,7 @@ void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, Prot
     default:
         break;
     }
+    xEventGroupSetBits(evgGUI,SHIFT_BIT_LEFT(GUI_EVT_UPDATE_VALUE_FROM_UART));
 }
 
 void MessageHandle::Begin(){
