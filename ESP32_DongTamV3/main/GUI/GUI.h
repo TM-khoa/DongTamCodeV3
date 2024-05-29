@@ -90,6 +90,7 @@ public:
      * @brief Hiển thị con trỏ màn hình
      */
     void ShowPointer(){
+
         uint8_t px = GUI_Navigator::GetPx();
         uint8_t py = GUI_Navigator::GetPy();
         ClassLCDI2C::print(">",px,py);
@@ -109,13 +110,13 @@ public:
      * @param id mã thông số kiểm tra giá trị có được phép tăng tốc hay không
      */
     void AllowSpeedUpValueIfPointerNowIsValue(ParamID id){
+        if(GUI_Navigator::GetCurrentPage() != PAGE_SETTING) return;
         if(GUI_Navigator::GetPointerNow() == IS_VALUE && id < PARAM_STRING_PARAM_OFFSET) ButtonGUI::AllowToSpeedUp(true);
         else ButtonGUI::AllowToSpeedUp(false);
     }
 
-    void ResetLCD(){
-        ClassLCDI2C::begin();
-    }
+
+
 };
 
 

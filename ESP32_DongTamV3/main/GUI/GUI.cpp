@@ -4,6 +4,9 @@ TaskHandle_t taskHandleGUI;
 GUI_Manager gui;
 EventGroupHandle_t evgGUI;
 extern BoardParameter brdParam;
+void HandleEventResetLCD();
+void UpdateValueFromPortUART();
+void HandleNextPageEvent();
 /**
  * @brief Thứ tự hiển thị các thông số trên màn hình khớp với giao diện gốc của Đồng Tâm
  * Đây không phải thứ tự thực sự của thông số trong BoardParameter.h mà là thứ tự đã được mapping lại
@@ -43,28 +46,108 @@ void TaskManageGUI(void *pvParameter)
     GUI_LoadParamsToBuffer();
     gui.ShowPointer();
     for(;;){
-        if(xTaskNotifyWait(pdFALSE,pdTRUE,&e,portMAX_DELAY)){
+        if(xTaskNotifyWait(pdFALSE,pdTRUE,&e,10/portTICK_PERIOD_MS)){
             gui.ClearPointer();
             gui.WaitForEvent(e);
+            HandleNextPageEvent();
             ParamID id = paramMappingDisplay[gui.GetParamDisplayIndex()]; 
             gui.AllowSpeedUpValueIfPointerNowIsValue(id);
             GUI_LoadParamsToBuffer();
             gui.ShowPointer();
-            // ESP_LOGI("GUI_Event","%lu",e);
             // ESP_LOGI("CurrentSelectedParamID","%d",id);
         }
+            UpdateValueFromPortUART();
+            HandleEventResetLCD();
     }
+}
+
+void HandleNextPageEvent(){
+    EventBits_t e = xEventGroupWaitBits(evgGUI,
+    SHIFT_BIT_LEFT(GUI_EVT_NEXT_PAGE)
+    ,pdTRUE,pdFALSE,0);
+    if(CHECKFLAG(e,GUI_EVT_NEXT_PAGE) == true)
+        gui.clear(); // clear LCD
+}
+
+void UpdateValueFromPortUART(){
+    if(gui.GetCurrentPage() != PAGE_RUN) return;
+    EventBits_t e = xEventGroupWaitBits(evgGUI,SHIFT_BIT_LEFT(GUI_EVT_UPDATE_VALUE_FROM_UART), pdTRUE, pdFALSE, 0);
+    if(CHECKFLAG(e,GUI_EVT_UPDATE_VALUE_FROM_UART) == false) return;
+    static uint8_t valueLengthPre[5] = {0};
+    char s[LCD_COLS] = {0};
+    float ams5195 = brdParam.GetPressureAMS5915();
+    float sp100 = brdParam.GetPressureSP100();
+    RTC_t t = brdParam.GetRTC();
+    uint8_t lcdRow = 0;
+    int temp;
+    strcpy(s,"AMS5915:");
+    temp = sprintf(s + strlen(s),"%.2f",ams5195);
+    if((uint8_t)temp < valueLengthPre[lcdRow]){
+        for(uint8_t i = 0; i < valueLengthPre[lcdRow] - (uint8_t)temp; i++){
+            strcat(s," ");
+        }
+        valueLengthPre[lcdRow] = temp;
+    }
+    else {
+        valueLengthPre[lcdRow] = temp;
+    }
+    gui.print(s,1,lcdRow);
+    gui.print("mbar",LCD_COLS - strlen("mbar"),lcdRow);
+    memset(s,0,strlen(s));
+    lcdRow++;
+    strcpy(s,"SP100:");
+    temp = sprintf(s + strlen(s),"%.2f",sp100);
+    if((uint8_t)temp < valueLengthPre[lcdRow]){
+        for(uint8_t i = 0; i < valueLengthPre[lcdRow] - (uint8_t)temp; i++){
+            strcat(s," ");
+        }
+        valueLengthPre[lcdRow] = temp;
+    }
+    else {
+        valueLengthPre[lcdRow] = temp;
+    }
+    gui.print(s,1,lcdRow);
+    gui.print("MPa",LCD_COLS - strlen("MPa"),lcdRow);
+    memset(s,0,strlen(s));
+    lcdRow++;
+    strcpy(s,"Time:");
+    temp = sprintf(s + strlen(s),"%u:%u:%u %u/%u",t.hour,t.minute,t.second,t.day,t.month);
+    if((uint8_t)temp < valueLengthPre[lcdRow]){
+        for(uint8_t i = 0; i < valueLengthPre[lcdRow] - (uint8_t)temp; i++){
+            strcat(s," ");
+        }
+        valueLengthPre[lcdRow] = temp;
+    }
+    else {
+        valueLengthPre[lcdRow] = temp;
+    }
+    gui.print(s,1,lcdRow);
+    memset(s,0,strlen(s));
+
+
+}
+
+
+void HandleEventResetLCD(){
+    EventBits_t e;
+    // Kiểm tra nếu có sự kiện refresh và load thông số mới vào bộ đệm
+    e = xEventGroupWaitBits(evgGUI,
+    SHIFT_BIT_LEFT(GUI_EVT_RESET_LCD), pdTRUE, pdFALSE, 0);  // Nếu có sự kiện reset LCD
+    if(!CHECKFLAG(e,GUI_EVT_RESET_LCD)) return;
+    gui.begin();
+    ESP_LOGW("Reset","LCD");
 }
 
 /**
  * @brief Load các thông số vào bộ đệm GUI
  */
 void GUI_LoadParamsToBuffer(){
+    if(gui.GetCurrentPage() != PAGE_SETTING) return;
     EventBits_t e;
     // Kiểm tra nếu có sự kiện refresh và load thông số mới vào bộ đệm
     e = xEventGroupWaitBits(evgGUI,
-    SHIFT_BIT_LEFT(PARAM_EVT_REFRESH_NEXT_PARAMS_DISPLAY) | // load 4 thông số từ hàng đầu xuống cuối cùng tính từ thông số hiện tại
-    SHIFT_BIT_LEFT(PARAM_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY) // load 4 thông số từ hàng cuối cùng lên hàng đầu tiên tính từ thông số hiện tại
+    SHIFT_BIT_LEFT(GUI_EVT_REFRESH_NEXT_PARAMS_DISPLAY) | // load 4 thông số từ hàng đầu xuống cuối cùng tính từ thông số hiện tại
+    SHIFT_BIT_LEFT(GUI_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY) // load 4 thông số từ hàng cuối cùng lên hàng đầu tiên tính từ thông số hiện tại
     ,pdTRUE,pdFALSE,0);
 
     uint8_t currentParamDisplayIndex = gui.GetParamDisplayIndex();
@@ -74,7 +157,7 @@ void GUI_LoadParamsToBuffer(){
     gui.ResetBufferGUI();
 
     // Lấy ra thứ tự của các phần tử hiện tại và tiếp theo của Mảng ánh xạ thông số
-    if(CHECKFLAG(e,PARAM_EVT_REFRESH_NEXT_PARAMS_DISPLAY) == true) {
+    if(CHECKFLAG(e,GUI_EVT_REFRESH_NEXT_PARAMS_DISPLAY) == true) {
         // Load lần lượt 4 thông số liên tiếp vào bộ đệm GUI
         for(uint8_t i = 0; i < LCD_ROWS; i++){
             // dùng để kiểm tra các thông số tiếp theo có vượt quá phạm vi của Mảng ánh xạ thông số
@@ -98,7 +181,7 @@ void GUI_LoadParamsToBuffer(){
             brdParam.PrintParameter(*pParam); 
         }
     }
-    else if (CHECKFLAG(e,PARAM_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY) == true){
+    else if (CHECKFLAG(e,GUI_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY) == true){
         // Load lần lượt 4 thông số liên tiếp vào bộ đệm GUI
         for(uint8_t i = 0; i < LCD_ROWS; i++){
             // dùng để kiểm tra các thông số tiếp theo có vượt quá phạm vi của Mảng ánh xạ thông số
@@ -132,19 +215,20 @@ void GUI_LoadParamsToBuffer(){
  * @brief Xử lý sự kiện tăng giảm giá trị thông số khi nhấn nút trên màn hình GUI
  */
 void HandleChangeValueEvent(){
+    if(gui.GetCurrentPage() != PAGE_SETTING) return;
     if(gui.GetPointerNow() != IS_VALUE) return;
     EventBits_t e;
     // Kiểm tra nếu có sự kiện tăng hoặc giảm giá trị
     e = xEventGroupWaitBits(evgGUI,
-    SHIFT_BIT_LEFT(PARAM_EVT_INCREASE_VALUE) | 
-    SHIFT_BIT_LEFT(PARAM_EVT_DECREASE_VALUE) 
+    SHIFT_BIT_LEFT(GUI_EVT_INCREASE_VALUE) | 
+    SHIFT_BIT_LEFT(GUI_EVT_DECREASE_VALUE) 
     ,pdTRUE,pdFALSE,0);
     ParamID id = paramMappingDisplay[gui.GetParamDisplayIndex()];
 
-    if(CHECKFLAG(e,PARAM_EVT_INCREASE_VALUE) == true) {
+    if(CHECKFLAG(e,GUI_EVT_INCREASE_VALUE) == true) {
         brdParam.IncreaseNextValue(id);
     }
-    else if(CHECKFLAG(e,PARAM_EVT_DECREASE_VALUE) == true) {
+    else if(CHECKFLAG(e,GUI_EVT_DECREASE_VALUE) == true) {
         brdParam.DecreasePreviousValue(id);
     }
 
@@ -155,7 +239,7 @@ void InitGUI()
     /***********************************************Init section************************************************/
     evgGUI = xEventGroupCreate();
 
-    xEventGroupSetBits(evgGUI,SHIFT_BIT_LEFT(PARAM_EVT_REFRESH_NEXT_PARAMS_DISPLAY));
+    xEventGroupSetBits(evgGUI,SHIFT_BIT_LEFT(GUI_EVT_REFRESH_NEXT_PARAMS_DISPLAY));
     gui.Begin(taskHandleGUI,evgGUI,sizeof(paramMappingDisplay)/sizeof(ParamID));
     gui.TurnOnBackLight();
     
