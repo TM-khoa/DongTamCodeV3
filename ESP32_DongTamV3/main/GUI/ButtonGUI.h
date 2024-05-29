@@ -21,7 +21,8 @@ typedef enum EventButton{
     EVT_BTN_SET,
     EVT_BTN_UP,
     EVT_BTN_DOWN_RIGHT,
-    EVT_LCD_RESET,
+    EVT_BTN_LCD_RESET,
+    EVT_BTN_NEXT_PAGE,
 }EventButton;
 
 class ButtonGUI{
@@ -84,12 +85,12 @@ private:
           * Khi nhấn giữ 5s nút Menu thì sẽ reset LCD nếu bị lỗi hiển thị  
           * @note Lưu ý không được để ESP_LOGI trong này, nếu không LCD sẽ bị lỗi ghi I2C vào PCF8574  (dự đoán có thể do tràn stack)
           * */ 
-        else if(gpio == BTN_MENU){
-            vTaskDelay(1000/portTICK_PERIOD_MS);
+        if(gpio == BTN_MENU){
+            vTaskDelay(500/portTICK_PERIOD_MS);
             resetWhenErrorLCD_Count++;
             // Wait for 5 seconds or above to send notify 
             if(resetWhenErrorLCD_Count >= 5){
-                xTaskNotify(_taskHandleGUI,EVT_LCD_RESET,eSetValueWithoutOverwrite);
+                xTaskNotify(_taskHandleGUI, EVT_BTN_LCD_RESET, eSetValueWithoutOverwrite);
                 resetWhenErrorLCD_Count = 0;
             }
         }
@@ -148,6 +149,7 @@ private:
         if(allow) isAllowToSpeedUp = true;
         else isAllowToSpeedUp = false;
     }
+
 
     /**
      * @brief Chạy liên tục trong vòng lặp không thoát để quét đọc nút nhấn
