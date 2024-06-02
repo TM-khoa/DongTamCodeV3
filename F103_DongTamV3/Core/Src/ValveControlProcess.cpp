@@ -27,6 +27,8 @@ void ValveControl::InValveOnProcess() {
 void ValveControl::InPulseTimeProcess() {
 	if (_timerTick * TIMER_PERIOD_MS > _pulseTime) {
 		_timerTick = 0;
+		_valveStatus = ValveFeedback::GetInputValue();
+		_allowToSendData = true;
 		_processStep = PROCESS_VALVE_OFF;
 	}
 }
@@ -93,22 +95,5 @@ void ValveControl::ValveProcessRun() {
 		break;
 
 	}
-}
-void ValveControl::StartValveProcess() {
-	_isOnProcess = true;
-	_processStep = PROCESS_START;
-
-}
-void ValveControl::StopValveProcess() {
-	_isOnProcess = false;
-	_timerTick = 0;
-}
-
-bool ValveControl::IsOnProcess() {
-	return _isOnProcess;
-}
-
-ValveControlProcessStep ValveControl::GetProcessStep() {
-	return _processStep;
 }
 

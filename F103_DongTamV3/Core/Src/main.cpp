@@ -231,6 +231,13 @@ int main(void) {
 	while (1) {
 		HAL_IWDG_Refresh(&hiwdg);
 		vc.ValveProcessRun();
+		if (vc.IsAllowToSendValveData() == true) {
+			ValveData vData;
+			vData.valveStatus = vc.GetValveStatus();
+			vData.currentValveTrigger = vc.GetCurrentTriggerValve();
+			mesg.SendFrame((void*) &vData, sizeof(ValveData), PROTOCOL_ID_VALVE, SET_DATA_TO_THIS_DEVICE);
+			vc.NotAllowSendValveData();
+		}
 		EnableGetRTC();
 		EnableSetRTC();
 		if ((huart1.Instance->CR1 & USART_CR1_UE) == 0) {

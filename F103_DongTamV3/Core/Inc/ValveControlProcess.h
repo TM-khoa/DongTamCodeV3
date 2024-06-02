@@ -48,7 +48,7 @@ class ValveFeedback {
 		HC165_t expanderInput;
 };
 
-class ValveControl {
+class ValveControl: public ValveFeedback {
 	private:
 
 		uint16_t _timerTick;
@@ -57,7 +57,8 @@ class ValveControl {
 		uint8_t _valveRemainToTrigger; // số van còn lại trong chu trình cần phải kích
 		uint8_t _cycleIntervalTime; //thời gian nghỉ giữa 2 chu kỳ kích van (khoảng nghỉ sau khi kích van cuối cùng và bắt đầu chu trình mới), tính bằng s
 		uint8_t _totalValve;
-		bool _isOnProcess;
+		uint16_t _valveStatus;
+		bool _isOnProcess, _allowToSendData;
 		ValveControlProcessStep _processStep;
 		HC595 _hc595;
 		void InValveOnProcess();
@@ -165,11 +166,79 @@ class ValveControl {
 			HC595_ShiftOut(NULL, 2, 1);
 		}
 
-		bool IsOnProcess();
-		ValveControlProcessStep GetProcessStep();
-		void StartValveProcess();
-		void StopValveProcess();
-		void ValveProcessRun();
+		uint8_t GetCurrentTriggerValve() {
+			return _totalValve - _valveRemainToTrigger;
+		}
+
+		uint16_t GetValveStatus() {
+			return _valveStatus;
+		}
+
+		/**
+		 * @brief Cho biết hiện tại valve đang ở giai đoạn nào trong chu trình kích van
+		 *
+		 *
+		 * @return enum ValveControlProcessStep
+		 */
+		ValveControlProcessStep GetProcessStep() {
+			return _processStep;
+		}
+
+		/**
+		 * @brief Trước khi chuyển sang trạng thái PROCESS_VALVE_OFF thì phương thức sẽ trả về true
+		 * Hàm xử lý bên ngoài cần đợi giá trị phương thức này là true thì thực hiện lấy thông tin
+		 * trạng thái valve và valve hiện tại đang kích
+		 * @note Hàm này cần phải đi kèm với phương thức NotAllowSendValveData sau khi thực hiện gửi thông tin
+		 * đến ESP32(thành công hoặc không thành công đều phải gọi NotAllowSendValveData)
+		 * @example
+		 * void main()
+		 * {
+		 * 		ValveControl valveControl;
+		 * 		if(valveControl.IsAllowToSendValveData == true)
+		 * 		{
+		 * 			//Do something to send data
+		 * 			SendData();
+		 * 			// Set status to not allow send data
+		 * 			valveControl.NotAllowSendValveData();
+		 * 		}
+		 *
+		 * }
+		 *
+		 * @return true nếu cho phép gửi
+		 * false thì phải đợi khi giá trị trả về là true thì mới thực hiện xử lý, sau đó
+		 * dùng phương thức NotAllowSendValveData
+		 */
+		bool IsAllowToSendValveData() {
+			return _allowToSendData;
+		}
+
+		/**
+		 * @brief Sau khi gửi thông tin kích van lên ESP32 thì cần tắt trạng thái cho phép
+		 * gửi
+		 * @Note Dùng kèm với phương thức IsAllowToSendValveData
+		 */
+		void NotAllowSendValveData() {
+			_allowToSendData = false;
+		}
+
+		/**
+		 * @brief Cho phép khởi động chu trình kích van
+		 *
+		 */
+		void ValveControl::StartValveProcess() {
+			_isOnProcess = true;
+			_timerTick = 0;
+			_processStep = PROCESS_START;
+
+		}
+		/**
+		 * @brief Ngừng chu trình kích van, không khởi động lại từ đầu
+		 *
+		 */
+		void ValveControl::StopValveProcess() {
+			_isOnProcess = false;
+			_timerTick = 0;
+		}
 
 };
 

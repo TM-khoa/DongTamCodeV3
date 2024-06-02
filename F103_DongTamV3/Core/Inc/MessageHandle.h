@@ -14,10 +14,16 @@
 
 typedef HAL_StatusTypeDef (*pfnSend)(UART_HandleTypeDef *huart, const uint8_t *pData, uint16_t Size, uint32_t Timeout);
 typedef HAL_StatusTypeDef (*pfnReceive)(UART_HandleTypeDef *huart, uint8_t *pData, uint16_t Size);
+
 typedef struct PressureTwoSensorValue {
 		float sensorAMS5915;
 		float sensorSP100;
 } PressureTwoSensorValue;
+
+typedef struct ValveData {
+		uint16_t valveStatus;
+		uint8_t currentValveTrigger;
+} ValveData;
 
 void HandleMessageCallback(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, ProtocolListID id, GetSetFlag getSetFlag);
 
@@ -91,8 +97,29 @@ class MessageHandle: public Protocol {
 			SendFrame(PROTOCOL_ID_PRESSURE, SET_DATA_TO_THIS_DEVICE);
 		}
 
+		/**
+		 * @brief Lấy dữ liệu đã đăng ký từ trước đưa đi đóng gói thành khung truyền và gửi đi
+		 * @note Yêu cầu đối số cần gửi phải đăng ký trước bằng phương thức Protocol::RegisterArgument
+		 * @note Yêu cầu bộ đệm gửi phải đăng ký trước bằng phương thức Protocol::RegisterStorageBuffer
+		 * @param protocolID Mã định dạng khung truyền
+		 * @param getSetFlag Cờ báo yêu cầu đối tượng sẽ nhận dữ liệu hay phản hồi dữ liệu về.
+		 */
 		void SendFrame(ProtocolListID protocolID, GetSetFlag getSetFlag) {
 			Protocol::MakeFrame(protocolID, getSetFlag);
+			FrameData fd = GetFrameDataInfo();
+			pSend(_targetUART, _txBuf, fd.totalLength, HAL_MAX_DELAY);
+			Protocol::ResetFrame();
+			memset(_txBuf, 0, fd.totalLength);
+		}
+
+		/**
+		 * @brief Lấy dữ liệu do người dùng cung cấp đóng gói thành khung truyền và gửi đi
+		 * @note Yêu cầu bộ đệm gửi phải đăng ký trước bằng phương thức Protocol::RegisterStorageBuffer
+		 * @param protocolID Mã định dạng khung truyền
+		 * @param getSetFlag Cờ báo yêu cầu đối tượng sẽ nhận dữ liệu hay phản hồi dữ liệu về.
+		 */
+		void SendFrame(void *payload, uint16_t sizeOfPayload, ProtocolListID protocolID, GetSetFlag getSetFlag) {
+			Protocol::MakeFrame(payload, sizeOfPayload, protocolID, getSetFlag);
 			FrameData fd = GetFrameDataInfo();
 			pSend(_targetUART, _txBuf, fd.totalLength, HAL_MAX_DELAY);
 			Protocol::ResetFrame();
