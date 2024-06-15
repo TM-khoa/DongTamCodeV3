@@ -42,14 +42,14 @@ typedef enum PointerNow{
 
 typedef enum Page{
     PAGE_START,
-    PAGE_SETTING,
     PAGE_RUN,
+    PAGE_SETTING,
     // PAGE_CONTROL,
     PAGE_END,
 }Page; 
 
 
-typedef enum ParametersEvent{
+typedef enum EventGUI{
     GUI_EVT_WRITE_PARAMS_TO_FLASH,
     GUI_EVT_GET_PARAMS_FROM_FLASH,
     GUI_EVT_VALUE_REACH_LIMIT,
@@ -60,7 +60,7 @@ typedef enum ParametersEvent{
     GUI_EVT_RESET_LCD,
     GUI_EVT_NEXT_PAGE,
     GUI_EVT_UPDATE_VALUE_FROM_UART,
-}ParametersEvent;
+}EventGUI;
 class GUI_Navigator
 {
 private:
@@ -126,9 +126,9 @@ public:
     void Begin(uint8_t maxDisplayParamIndex, EventGroupHandle_t evgGUI){
         _px = 0;
         _py = 0;
-        _page = PAGE_SETTING;
+        _page = (Page)1;
         _pNow = IS_KEYWORD;
-        _paramDisplayIndex = 1;
+        _paramDisplayIndex = 0;
         _maxDisplayParamIndex = maxDisplayParamIndex;
         _evgGUI = evgGUI;
     }
@@ -147,6 +147,13 @@ public:
      */
     uint8_t GetParamDisplayIndex(){
         return _paramDisplayIndex;
+    }
+
+    /**
+     * @brief Khi refresh màn hình, cần phải reset thông số hiển thị về phần tử thứ 0
+     */
+    void ResetParamDisplayIndex(){
+        _paramDisplayIndex = 0;
     }
 
     /**
@@ -175,7 +182,6 @@ public:
         // Nếu đạt tới giới hạn index thì không cho phép thay đổi hàng
         if(_paramDisplayIndex >= _maxDisplayParamIndex - 1) {
             _paramDisplayIndex = _maxDisplayParamIndex - 1;
-            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_REFRESH_NEXT_PARAMS_DISPLAY));
             return;
         }
         else _paramDisplayIndex++;
@@ -194,44 +200,38 @@ public:
      */
     void MovePreviousParam(){
         // Nếu đạt tới giới hạn index thì không cho phép thay đổi hàng
-        if(_paramDisplayIndex <= 1 || _paramDisplayIndex > _maxDisplayParamIndex - 1) {
-            _paramDisplayIndex = 1;
+        if(_paramDisplayIndex == 0 || _paramDisplayIndex > _maxDisplayParamIndex - 1) {
+            _paramDisplayIndex = 0;
             return;
         }
         else _paramDisplayIndex--;
         // ở hàng trên cùng thì quay về hàng dưới cùng
         if(_py == 0) {
             _py = LCD_ROWS - 1;
-            // Sự kiện yêu cầu load 4 thông số trước đó (từ hàng dưới cùng load lên hàng đầ tiên) tính từ _paramDisplayIndex hiện tại
+            // Sự kiện yêu cầu load 4 thông số trước đó (từ hàng dưới cùng load lên hàng đầu tiên) tính từ _paramDisplayIndex hiện tại
             xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY));
         }
         else _py--;//còn không thì giảm dần y (con trỏ di chuyển lên phía trên màn hình)
     }
     // WIP
     void MoveNextPage(){
-        if(_page >= PAGE_END) _page = (Page)(PAGE_START + 1);
+        if((Page)(_page + 1) >= PAGE_END) _page = (Page)(PAGE_START + 1);
         else {
             _page = (Page)(_page + 1);
-            xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_NEXT_PAGE));
         }
+        xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_NEXT_PAGE));
         ESP_LOGI("Page","Change to: %d",_page);
     }
 
-    Page GetCurrentPage() {
-        return _page;
-    }
+    Page GetCurrentPage() {return _page; }
 
-    PointerNow GetPointerNow(){
-        return _pNow;
-    }
+    PointerNow GetPointerNow(){return _pNow; }
 
-    uint8_t GetPx(){
-        return _px;
-    }
+    uint8_t GetPx(){return _px; }
 
-    uint8_t GetPy(){
-        return _py;
-    }
+    uint8_t GetPy(){return _py; }
+
+    void ResetPointer() {_px = 0; _py = 0;}
 
     /**
      * @brief Chờ sự kiện từ nút nhấn GUI do người dùng nhấn và xử lý tương ứng

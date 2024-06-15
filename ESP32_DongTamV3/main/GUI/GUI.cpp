@@ -4,6 +4,7 @@ TaskHandle_t taskHandleGUI;
 GUI_Manager gui;
 EventGroupHandle_t evgGUI;
 extern BoardParameter brdParam;
+Page prePage;
 void HandleEventResetLCD();
 void UpdateValueFromPortUART();
 void HandleNextPageEvent();
@@ -43,21 +44,20 @@ void TaskManageGUI(void *pvParameter)
 {
     EventBits_t e;
     InitGUI();
-    GUI_LoadParamsToBuffer();
     gui.ShowPointer();
     for(;;){
         if(xTaskNotifyWait(pdFALSE,pdTRUE,&e,10/portTICK_PERIOD_MS)){
             gui.ClearPointer();
             gui.WaitForEvent(e);
-            HandleNextPageEvent();
             ParamID id = paramMappingDisplay[gui.GetParamDisplayIndex()]; 
             gui.AllowSpeedUpValueIfPointerNowIsValue(id);
+            HandleNextPageEvent();
             GUI_LoadParamsToBuffer();
             gui.ShowPointer();
             // ESP_LOGI("CurrentSelectedParamID","%d",id);
         }
-            UpdateValueFromPortUART();
-            HandleEventResetLCD();
+        UpdateValueFromPortUART();
+        HandleEventResetLCD();
     }
 }
 
@@ -65,8 +65,17 @@ void HandleNextPageEvent(){
     EventBits_t e = xEventGroupWaitBits(evgGUI,
     SHIFT_BIT_LEFT(GUI_EVT_NEXT_PAGE)
     ,pdTRUE,pdFALSE,0);
-    if(CHECKFLAG(e,GUI_EVT_NEXT_PAGE) == true)
+    if(CHECKFLAG(e,GUI_EVT_NEXT_PAGE) == true){
         gui.clear(); // clear LCD
+        vTaskDelay(20/portTICK_PERIOD_MS);
+    } else return;
+    if(gui.GetCurrentPage() == PAGE_SETTING){
+        // Cần phải có sự kiện này thì màn hình mới refresh, không thì sẽ không hiển thị
+        xEventGroupSetBits(evgGUI,SHIFT_BIT_LEFT(GUI_EVT_REFRESH_NEXT_PARAMS_DISPLAY));
+        gui.ResetPointer();
+        gui.ResetBufferGUI();
+        gui.ResetParamDisplayIndex();
+    }
 }
 
 void UpdateValueFromPortUART(){
@@ -77,13 +86,21 @@ void UpdateValueFromPortUART(){
     char s[LCD_COLS] = {0};
     float ams5195 = brdParam.GetPressureAMS5915();
     float sp100 = brdParam.GetPressureSP100();
+    uint16_t *maxPressure = (uint16_t*)brdParam.GetValueAddress(PARAM_DP_HIGH);
+    uint16_t *minPressure = (uint16_t*)brdParam.GetValueAddress(PARAM_DP_LOW);
+    uint8_t pressureBarLevel = gui.CalculateLevelFromPressure(*maxPressure,*minPressure,ams5195);
+    gui.SetLevel(pressureBarLevel);
+    uint8_t currentVavleTrigger = brdParam.GetCurrentValveTrigger();
+    uint16_t valveStatus = brdParam.GetValveStatus();
     RTC_t t = brdParam.GetRTC();
     uint8_t lcdRow = 0;
     int temp;
+    // In giá trị áp suất AMS5915
     strcpy(s,"AMS5915:");
     temp = sprintf(s + strlen(s),"%.2f",ams5195);
+    //Nếu số ô cần hiển thị nhỏ hơn trước đó thì xóa bớt các ô hiển thị thừa của giá trị cũ 
     if((uint8_t)temp < valueLengthPre[lcdRow]){
-        for(uint8_t i = 0; i < valueLengthPre[lcdRow] - (uint8_t)temp; i++){
+        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
             strcat(s," ");
         }
         valueLengthPre[lcdRow] = temp;
@@ -94,11 +111,13 @@ void UpdateValueFromPortUART(){
     gui.print(s,1,lcdRow);
     gui.print("mbar",LCD_COLS - strlen("mbar"),lcdRow);
     memset(s,0,strlen(s));
+    // In giá trị áp suất SP100
     lcdRow++;
     strcpy(s,"SP100:");
     temp = sprintf(s + strlen(s),"%.2f",sp100);
+    //Nếu số ô cần hiển thị nhỏ hơn trước đó thì xóa bớt các ô hiển thị thừa của giá trị cũ 
     if((uint8_t)temp < valueLengthPre[lcdRow]){
-        for(uint8_t i = 0; i < valueLengthPre[lcdRow] - (uint8_t)temp; i++){
+        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
             strcat(s," ");
         }
         valueLengthPre[lcdRow] = temp;
@@ -109,11 +128,13 @@ void UpdateValueFromPortUART(){
     gui.print(s,1,lcdRow);
     gui.print("MPa",LCD_COLS - strlen("MPa"),lcdRow);
     memset(s,0,strlen(s));
+    // In thời gian thực
     lcdRow++;
     strcpy(s,"Time:");
     temp = sprintf(s + strlen(s),"%u:%u:%u %u/%u",t.hour,t.minute,t.second,t.day,t.month);
+    //Nếu số ô cần hiển thị nhỏ hơn trước đó thì xóa bớt các ô hiển thị thừa của giá trị cũ 
     if((uint8_t)temp < valueLengthPre[lcdRow]){
-        for(uint8_t i = 0; i < valueLengthPre[lcdRow] - (uint8_t)temp; i++){
+        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
             strcat(s," ");
         }
         valueLengthPre[lcdRow] = temp;
@@ -123,8 +144,23 @@ void UpdateValueFromPortUART(){
     }
     gui.print(s,1,lcdRow);
     memset(s,0,strlen(s));
-
-
+    // In valve đang kích và trạng thái valve
+    lcdRow++;
+    strcpy(s,"Valve:");
+    temp = sprintf(s + strlen(s),"%u ",currentVavleTrigger + 1);
+    if(valveStatus > 0) strcat(s,"OK");
+    else strcat(s,"Err");
+    if((uint8_t)temp < valueLengthPre[lcdRow]){
+        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
+            strcat(s," ");
+        }
+        valueLengthPre[lcdRow] = temp;
+    }
+    else {
+        valueLengthPre[lcdRow] = temp;
+    }
+    gui.print(s,1,lcdRow);
+    memset(s,0,strlen(s));
 }
 
 
@@ -257,3 +293,5 @@ void InitGUI()
  * @return TaskHandle_t* 
  */
 TaskHandle_t* GUI_GetTaskHandle(){ return &taskHandleGUI;}
+
+void GUI_SetEvent(EventGUI evtGUI){xEventGroupSetBits(evgGUI,SHIFT_BIT_LEFT(evtGUI));}
