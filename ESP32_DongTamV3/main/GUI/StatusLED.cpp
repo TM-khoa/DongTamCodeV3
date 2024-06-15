@@ -19,7 +19,7 @@ void StatusLED::OutputErrorLED(bool on)
 
 void StatusLED::Test(uint8_t blinkNum, uint16_t delay)
 {
-    for(uint8_t j = 0; j < 2; j++){
+    for(uint8_t j = 0; j < 1; j++){
         for(uint8_t i = 0; i < blinkNum; i++){
             OutputErrorLED(1);
             OutputStatusLED(0);
@@ -30,6 +30,6 @@ void StatusLED::Test(uint8_t blinkNum, uint16_t delay)
             HC595_ShiftOut(NULL,2,1);
             vTaskDelay((delay)/portTICK_PERIOD_MS);
         }
-        vTaskDelay(100/portTICK_PERIOD_MS);
+        vTaskDelay(50/portTICK_PERIOD_MS);
     }
 }
