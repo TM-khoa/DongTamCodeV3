@@ -75,6 +75,8 @@ private:
     RTC_t _t;
     float _pressureSP100;
     float _pressureAMS5915;
+    uint8_t _currentValveTrigger;
+    uint16_t _valveStatus;
 public:
     void Begin();
     void SetParameter(Parameter_t *param, const char* keyName, void* value, DataType dataType, ParamID id, uint8_t stepChange, uint16_t minValue, uint16_t maxValue,const char* unit);
@@ -90,9 +92,18 @@ public:
     void SetRTC(RTC_t t){ _t = t;}
     void SetPressureSP100(float p){_pressureSP100 = p;}
     void SetPressureAMS5915(float p){_pressureAMS5915 = p;}
+    void SetValveStatus(uint16_t valveStatus){_valveStatus = valveStatus;}
+    esp_err_t SetCurrentValveTrigger(uint8_t currentValveTrigger){
+        if(currentValveTrigger > 16 - 1) return ESP_ERR_INVALID_ARG;
+        _currentValveTrigger = currentValveTrigger;
+        return ESP_OK;
+    }
+
     RTC_t GetRTC(){ return _t;}
     float GetPressureSP100(){return _pressureSP100;}
     float GetPressureAMS5915(){return _pressureAMS5915;}
+    uint16_t GetValveStatus(){return _valveStatus;}
+    uint8_t GetCurrentValveTrigger(){return _currentValveTrigger;}
 
     RTC_t* GetAddrRTC(){ return &_t;}
 

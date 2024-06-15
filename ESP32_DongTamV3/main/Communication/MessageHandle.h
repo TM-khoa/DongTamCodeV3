@@ -9,6 +9,11 @@ typedef struct PressureTwoSensorValue {
 		float sensorSP100;
 } PressureTwoSensorValue;
 
+typedef struct ValveData {
+		uint16_t valveStatus;
+		uint8_t currentValveTrigger;
+} ValveData;
+
 class MessageHandle: public PortUART {
 public:
     void Begin();
@@ -68,12 +73,15 @@ public:
     PressureTwoSensorValue GetTwoSensorvalue(){return _pressure;}
     void SetTwoSensorValue(PressureTwoSensorValue p){_pressure = p;}
 
+    ValveData GetValveData(){return _vData;}
+
     void SetHandshake(bool handshake) {_isHandshake = handshake;}
     bool IsHandshake(){ return _isHandshake;}
 private:
-    uint16_t handshakeCode = 0;
+    uint16_t _handshakeCode = 0;
     bool _isHandshake;
     PressureTwoSensorValue _pressure;
+    ValveData _vData;
 };
 
 void TaskUART(void *pvParameters);

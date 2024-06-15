@@ -49,8 +49,8 @@ uint16_t paramInt[]= {
     3,// clean mode
     3,// test mode
     50,// contrast
-    700,//dp low
-    1300,//dp high
+    300,//dp low
+    1000,//dp high
     2300,//warn
     1000,//odc high
     250,//odc low
