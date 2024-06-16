@@ -3,9 +3,9 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_log.h"
-#include "sdkconfig.h"
 #include "freertos/queue.h"
+#include "esp_log.h"
+
 
 #define SHIFT_BIT_LEFT(STEP) (1UL << (STEP))
 #define CHECKFLAG(FlagGroup,FlagBit) ((((FlagGroup) & (1UL << FlagBit)) == (1UL << FlagBit)) ? 1 : 0)
@@ -18,6 +18,6 @@
 #define CONFIG_USE_LCDI2C
 #define CONFIG_USE_HD44780
 #define CONFIG_USE_CPP
-// #define CONFIG_USE_POSTGET
+#define CONFIG_USE_POSTGET
 
 #endif

@@ -6,7 +6,7 @@ EventGroupHandle_t evgGUI;
 extern BoardParameter brdParam;
 Page prePage;
 void HandleEventResetLCD();
-void UpdateValueFromPortUART();
+void OnPageRun();
 void HandleNextPageEvent();
 /**
  * @brief Thứ tự hiển thị các thông số trên màn hình khớp với giao diện gốc của Đồng Tâm
@@ -56,7 +56,7 @@ void TaskManageGUI(void *pvParameter)
             gui.ShowPointer();
             // ESP_LOGI("CurrentSelectedParamID","%d",id);
         }
-        UpdateValueFromPortUART();
+        OnPageRun();
         HandleEventResetLCD();
     }
 }
@@ -78,7 +78,7 @@ void HandleNextPageEvent(){
     }
 }
 
-void UpdateValueFromPortUART(){
+void OnPageRun(){
     if(gui.GetCurrentPage() != PAGE_RUN) return;
     EventBits_t e = xEventGroupWaitBits(evgGUI,SHIFT_BIT_LEFT(GUI_EVT_UPDATE_VALUE_FROM_UART), pdTRUE, pdFALSE, 0);
     if(CHECKFLAG(e,GUI_EVT_UPDATE_VALUE_FROM_UART) == false) return;
@@ -148,8 +148,7 @@ void UpdateValueFromPortUART(){
     lcdRow++;
     strcpy(s,"Valve:");
     temp = sprintf(s + strlen(s),"%u ",currentVavleTrigger + 1);
-    if(valveStatus > 0) strcat(s,"OK");
-    else strcat(s,"Err");
+    valveStatus > 0 ? strcat(s,"OK") : strcat(s,"Err");
     if((uint8_t)temp < valueLengthPre[lcdRow]){
         for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
             strcat(s," ");
@@ -295,3 +294,7 @@ void InitGUI()
 TaskHandle_t* GUI_GetTaskHandle(){ return &taskHandleGUI;}
 
 void GUI_SetEvent(EventGUI evtGUI){xEventGroupSetBits(evgGUI,SHIFT_BIT_LEFT(evtGUI));}
+bool GUI_CheckEvent(EventGUI evtGUI){
+    EventBits_t e = xEventGroupGetBits(evgGUI);
+    return CHECKFLAG(e,evtGUI);
+}

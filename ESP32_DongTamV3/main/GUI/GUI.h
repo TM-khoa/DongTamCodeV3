@@ -12,7 +12,12 @@
 #include "freertos/FreeRTOS.h"
 #include "GUI_Navigator.h"
 
-
+void TaskManageGUI(void *pvParameter);
+TaskHandle_t* GUI_GetTaskHandle();
+void GUI_SetEvent(EventGUI evtGUI);
+bool GUI_CheckEvent(EventGUI evtGUI);
+void InitGUI();
+void GUI_LoadParamsToBuffer();
 
 class GUI_Manager : public ClassLCDI2C, public GUI_Navigator, public PressureBar, public StatusLED, public ButtonGUI
 {
@@ -49,7 +54,6 @@ public:
     void PrintParamsToLCD(){
         clear();
         vTaskDelay(20/portTICK_PERIOD_MS); // chờ xóa màn hình
-        ESP_LOGW("PrintParamLCD","Clear and print");
         for(uint8_t i = 0; i < LCD_ROWS; i++){
             // Nếu thông số không được load thì con trỏ sẽ mang giá trị NULL
             if(_paramDisplayBuffer[i] == NULL) break;
@@ -121,9 +125,5 @@ public:
 };
 
 
-void TaskManageGUI(void *pvParameter);
-TaskHandle_t* GUI_GetTaskHandle();
-void GUI_SetEvent(EventGUI evtGUI);
-void InitGUI();
-void GUI_LoadParamsToBuffer();
+
 #endif

@@ -17,16 +17,20 @@
 #include "GUI/PressureBar.h"
 #include "BoardParameter.h"
 #include "Communication/MessageHandle.h"
-
+#include "esp_netif.h"
+#include "esp_wifi.h"
+#include "OnlineManage/OnlineManage.h"
 // #pragma warn -par /* parameter never used */ 
 
 extern "C" void app_main(void)
 {
     InitBoardParameter();
+    TaskHandle_t *taskHandleOnline = OnlineManage_GetOnlineTaskHandle();
     TaskHandle_t *taskHandleGUI = GUI_GetTaskHandle();
-    xTaskCreate(TaskManageGUI, "TaskGUI", 4096, NULL, 2, taskHandleGUI);
-    xTaskCreate(TaskScanButton,"TaskBtnGUI",1024,NULL,1,NULL);
+    xTaskCreate(TaskManageGUI, "TaskGUI", 4096, NULL, 5, taskHandleGUI);
+    xTaskCreate(TaskScanButton,"TaskBtnGUI",2048,NULL,1,NULL);
     xTaskCreate(TaskUART,"TaskUART",3072,NULL,3,NULL);
+    xTaskCreatePinnedToCore(TaskOnlineManager,"TaskOnlineManager",3072,NULL,2,taskHandleOnline,1);
     while(1){
         vTaskDelay(10/portTICK_PERIOD_MS);
     }

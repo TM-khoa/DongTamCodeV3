@@ -33,7 +33,7 @@ void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, Prot
             // Những thông số cần hiển thị lên màn hình thì mới set event
             GUI_SetEvent(GUI_EVT_UPDATE_VALUE_FROM_UART);
             // Khi nào van kích thì mới gửi thông tin lên server
-            TaskHandle_t *taskHandleOnline = OnlineManage_GetOnlineTaskHandle();
+            OnlineManage_SetEvent(ONLEVT_SEND_DATA_TO_SERVER);
 
         }
         break;            
@@ -68,6 +68,7 @@ void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, Prot
             mesg.GetValueFromPayload(inputBuffer,sizeOfInputBuffer);
             // Những thông số cần hiển thị lên màn hình thì mới set event
             GUI_SetEvent(GUI_EVT_UPDATE_VALUE_FROM_UART);
+            OnlineManage_SetEvent(ONLEVT_RTC_RECEIVED_FROM_STM32);
             // RTC_t t = brdParam.GetRTC();
             // ESP_LOGI("RTC","h:%u, m:%u, s:%u, d:%u, mth:%u, y:%u",t.hour,t.minute,t.second,t.day,t.month,t.year);
         }
