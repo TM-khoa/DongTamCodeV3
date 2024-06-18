@@ -221,11 +221,12 @@ class ValveControl: public ValveFeedback {
 			_allowToSendData = false;
 		}
 
+		void ValveProcessRun();
 		/**
 		 * @brief Cho phép khởi động chu trình kích van
 		 *
 		 */
-		void ValveControl::StartValveProcess() {
+		void StartValveProcess() {
 			_isOnProcess = true;
 			_timerTick = 0;
 			_processStep = PROCESS_START;
@@ -235,11 +236,14 @@ class ValveControl: public ValveFeedback {
 		 * @brief Ngừng chu trình kích van, không khởi động lại từ đầu
 		 *
 		 */
-		void ValveControl::StopValveProcess() {
+		void StopValveProcess() {
 			_isOnProcess = false;
 			_timerTick = 0;
 		}
 
+		bool IsOnProcess() {
+			return _isOnProcess;
+		}
 };
 
 #endif /* INC_VALVECONTROLPROCESS_H_ */
