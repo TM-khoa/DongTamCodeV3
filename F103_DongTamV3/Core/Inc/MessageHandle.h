@@ -11,6 +11,7 @@
 #include "main.h"
 #include "Protocol.h"
 #include "RTC_Format.h"
+#include "PCF8563.h"
 
 typedef HAL_StatusTypeDef (*pfnSend)(UART_HandleTypeDef *huart, const uint8_t *pData, uint16_t Size, uint32_t Timeout);
 typedef HAL_StatusTypeDef (*pfnReceive)(UART_HandleTypeDef *huart, uint8_t *pData, uint16_t Size);
