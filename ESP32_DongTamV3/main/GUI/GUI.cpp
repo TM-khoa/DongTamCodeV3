@@ -54,7 +54,6 @@ void TaskManageGUI(void *pvParameter)
             HandleNextPageEvent();
             GUI_LoadParamsToBuffer();
             gui.ShowPointer();
-            // ESP_LOGI("CurrentSelectedParamID","%d",id);
         }
         OnPageRun();
         HandleEventResetLCD();
@@ -169,8 +168,7 @@ void HandleEventResetLCD(){
     e = xEventGroupWaitBits(evgGUI,
     SHIFT_BIT_LEFT(GUI_EVT_RESET_LCD), pdTRUE, pdFALSE, 0);  // Nếu có sự kiện reset LCD
     if(!CHECKFLAG(e,GUI_EVT_RESET_LCD)) return;
-    gui.begin();
-    ESP_LOGW("Reset","LCD");
+    gui.reinit_hd44780();
 }
 
 /**

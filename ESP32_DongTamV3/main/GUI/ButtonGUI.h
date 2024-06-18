@@ -16,6 +16,8 @@
 #define BT3_MASK (1ULL<<GPIO_NUM_34)
 #define BT4_MASK (1ULL<<GPIO_NUM_35)
 
+#define RESET_READ_BTN_EVENT 200
+
 typedef enum EventButton{
     EVT_BTN_MENU,
     EVT_BTN_SET,
@@ -54,7 +56,7 @@ private:
         static uint16_t delayCountLoop = 0;
         static uint8_t resetWhenErrorLCD_Count = 0;
         // reset lại thông số nếu thoát khỏi chế độ nhấn giữ
-        if(e == 0){
+        if(e == RESET_READ_BTN_EVENT){
             delayCountLoop = 0;
             resetWhenErrorLCD_Count = 0;
             delay = BTN_HOLD_DELAY_MAX;
@@ -66,7 +68,6 @@ private:
         thay vì điều hướng các thông số thì mới được phép gửi
         */
         if((((gpio == BTN_UP) || (gpio == BTN_DOWN_RIGHT)) && isAllowToSpeedUp) 
-        // && (GUINAV_GetCurrentSelected() == IS_VALUE)
         ) {
             vTaskDelay(delay/portTICK_PERIOD_MS);
             delayCountLoop += 1;
@@ -78,7 +79,7 @@ private:
 
             */
             if(delayCountLoop > DELAY_COUNT_LOOP_THRESHOLD - 1) {
-                xTaskNotify(_taskHandleGUI,e,eSetValueWithoutOverwrite);
+                xTaskNotify(_taskHandleGUI,SHIFT_BIT_LEFT(e),eSetValueWithoutOverwrite);
             }
         }
          /** Button MENU should be handle to reset LCD if it is error
@@ -86,11 +87,11 @@ private:
           * @note Lưu ý không được để ESP_LOGI trong này, nếu không LCD sẽ bị lỗi ghi I2C vào PCF8574  (dự đoán có thể do tràn stack)
           * */ 
         if(gpio == BTN_MENU){
-            vTaskDelay(500/portTICK_PERIOD_MS);
+            vTaskDelay(200/portTICK_PERIOD_MS);
             resetWhenErrorLCD_Count++;
             // Wait for 5 seconds or above to send notify 
-            if(resetWhenErrorLCD_Count >= 5){
-                xTaskNotify(_taskHandleGUI, EVT_BTN_LCD_RESET, eSetValueWithoutOverwrite);
+            if(resetWhenErrorLCD_Count >= 25){
+                xTaskNotify(_taskHandleGUI, SHIFT_BIT_LEFT(EVT_BTN_LCD_RESET), eSetValueWithOverwrite);
                 resetWhenErrorLCD_Count = 0;
             }
         }
@@ -140,8 +141,9 @@ private:
             while(!gpio_get_level(gpio)){
                 DoThingWhenHoldingButton(gpio,e);
             } 
-            DoThingWhenHoldingButton(gpio,0);
-            xTaskNotify(_taskHandleGUI,e,eSetValueWithoutOverwrite);
+            // Gửi một mã sự kiện khác với các sự kiện trong enum để reset trạng thái đọc nút nhấn
+            DoThingWhenHoldingButton(gpio,RESET_READ_BTN_EVENT);
+            xTaskNotify(_taskHandleGUI,SHIFT_BIT_LEFT(e),eSetValueWithoutOverwrite);
         }
     }
     

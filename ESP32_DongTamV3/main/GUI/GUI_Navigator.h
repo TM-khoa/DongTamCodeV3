@@ -113,6 +113,7 @@ private:
      */
     void SendEventResetLCD(){
         xEventGroupSetBits(_evgGUI,SHIFT_BIT_LEFT(GUI_EVT_RESET_LCD));
+        
     }
 
     /**
@@ -239,6 +240,7 @@ public:
      * @param e Các sự kiện thuộc enum EventButton
      */
     void WaitForEvent(EventBits_t e){
+        ESP_LOGW("Navigator","event:%lu, LCD reset event %lu",e,SHIFT_BIT_LEFT(EVT_BTN_LCD_RESET));
         HandleEvent(e,SHIFT_BIT_LEFT(EVT_BTN_MENU),&GUI_Navigator::MoveNextPage,&GUI_Navigator::PointerNowIsKeyword);
         if(_page == PAGE_SETTING){
             HandleEvent(e,SHIFT_BIT_LEFT(EVT_BTN_SET),&GUI_Navigator::PointerNowIsValue,&GUI_Navigator::SendEventSaveParamsToFlash);
