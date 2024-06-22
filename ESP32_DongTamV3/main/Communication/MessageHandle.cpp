@@ -9,7 +9,7 @@
 MessageHandle mesg;
 extern BoardParameter brdParam;
 void ErrorMessage(ProtocolErrorCode err){mesg.HandleErrorMessage(err);}
-void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, ProtocolListID id, GetSetFlag getSetFlag){
+void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, ProtocolID id, GetSetFlag getSetFlag){
     // FrameData fd = mesg.GetFrameDataInfo();
     // ESP_LOGI("Receive Message", "totalLength:%u,ID:%d,GetSetFlag:%d",fd.totalLength,id,getSetFlag);
 
@@ -37,6 +37,9 @@ void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, Prot
 
         }
         break;            
+    case PROTOCOL_ID_IS_ON_PROCESS:
+        
+        break;
     case PROTOCOL_ID_PULSE_TIME:
         
         break;
@@ -81,11 +84,11 @@ void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, Prot
 }
 
 void MessageHandle::Begin(){
-    RegisterArgument(brdParam.GetValueAddress(PARAM_TOTAL_VALVE),sizeof(uint16_t),PROTOCOL_ID_TOTAL_VALVE);
-    RegisterArgument((void*)&_pressure,sizeof(PressureTwoSensorValue),PROTOCOL_ID_PRESSURE);
-    RegisterArgument((void*)brdParam.GetAddrRTC(),sizeof(RTC_t),PROTOCOL_ID_RTC_TIME);
-    RegisterArgument((void*)&_handshakeCode, 0, PROTOCOL_ID_HANDSHAKE);
-    RegisterArgument((void*)&_vData,sizeof(ValveData),PROTOCOL_ID_VALVE);
+    RegisterArgument(brdParam.GetValueAddress(PARAM_TOTAL_VALVE),sizeof(uint16_t),(ProtocolID)PROTOCOL_ID_TOTAL_VALVE);
+    RegisterArgument((void*)&_pressure,sizeof(PressureTwoSensorValue),(ProtocolID)PROTOCOL_ID_PRESSURE);
+    RegisterArgument((void*)brdParam.GetAddrRTC(),sizeof(RTC_t),(ProtocolID)PROTOCOL_ID_RTC_TIME);
+    RegisterArgument((void*)&_handshakeCode, 0, (ProtocolID)PROTOCOL_ID_HANDSHAKE);
+    RegisterArgument((void*)&_vData,sizeof(ValveData),(ProtocolID)PROTOCOL_ID_VALVE);
     RegisterReceivedCallbackEvent(&HandleReceiveMessage);
     RegisterErrorEvent(&ErrorMessage);
 }

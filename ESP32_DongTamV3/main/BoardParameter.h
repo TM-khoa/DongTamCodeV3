@@ -3,6 +3,7 @@
 #include "main.h"
 #include "string.h"
 #include "RTC_Format.h"
+#include "nvs_flash.h"
 #define LENGTH_OF_PARAM     11 //length of paramText
 
 typedef enum DataType{
@@ -77,6 +78,7 @@ private:
     float _pressureAMS5915;
     uint8_t _currentValveTrigger;
     uint16_t _valveStatus;
+    nvs_handle_t _brdHandleNVS;
 public:
     void Begin();
     void SetParameter(Parameter_t *param, const char* keyName, void* value, DataType dataType, ParamID id, uint8_t stepChange, uint16_t minValue, uint16_t maxValue,const char* unit);
@@ -84,10 +86,13 @@ public:
     void PrintParameter(ParamID id);
     void PrintParameter(Parameter_t param);
     void PrintAllParameter();
-    void IncreaseNextValue(ParamID id);
-    void DecreasePreviousValue(ParamID id);
+    esp_err_t IncreaseNextValue(ParamID id);
+    esp_err_t DecreasePreviousValue(ParamID id);
     esp_err_t GetParameter(Parameter_t **pParam, ParamID id);
     void* GetValueAddress(ParamID id);
+    esp_err_t SaveParamsValueToFlash();
+    esp_err_t ReadParamsValueFromFlash();
+
 
     void SetRTC(RTC_t t){ _t = t;}
     void SetPressureSP100(float p){_pressureSP100 = p;}

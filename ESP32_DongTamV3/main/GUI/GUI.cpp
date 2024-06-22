@@ -1,5 +1,7 @@
 #include "GUI.h"
 #include "../BoardParameter.h"
+#include "esp_timer.h"
+#include "../OnlineManage/OnlineManage.h"
 TaskHandle_t taskHandleGUI;
 GUI_Manager gui;
 EventGroupHandle_t evgGUI;
@@ -8,6 +10,8 @@ Page prePage;
 void HandleEventResetLCD();
 void OnPageRun();
 void HandleNextPageEvent();
+void HandleChangeValueEvent();
+void SaveFlashAction();
 /**
  * @brief Thứ tự hiển thị các thông số trên màn hình khớp với giao diện gốc của Đồng Tâm
  * Đây không phải thứ tự thực sự của thông số trong BoardParameter.h mà là thứ tự đã được mapping lại
@@ -48,16 +52,168 @@ void TaskManageGUI(void *pvParameter)
     for(;;){
         if(xTaskNotifyWait(pdFALSE,pdTRUE,&e,10/portTICK_PERIOD_MS)){
             gui.ClearPointer();
-            gui.WaitForEvent(e);
+            gui.WaitForButtonEvent(e);
             ParamID id = paramMappingDisplay[gui.GetParamDisplayIndex()]; 
             gui.AllowSpeedUpValueIfPointerNowIsValue(id);
             HandleNextPageEvent();
+            SaveFlashAction();
+            HandleChangeValueEvent();
             GUI_LoadParamsToBuffer();
             gui.ShowPointer();
         }
         OnPageRun();
         HandleEventResetLCD();
     }
+}
+
+void OnPageRun(){
+    if(gui.GetCurrentPage() != PAGE_RUN) return;
+    EventBits_t e = xEventGroupWaitBits(evgGUI,SHIFT_BIT_LEFT(GUI_EVT_UPDATE_VALUE_FROM_UART), pdTRUE, pdFALSE, 0);
+    if(CHECKFLAG(e,GUI_EVT_UPDATE_VALUE_FROM_UART) == false) return;
+    static uint8_t valueLengthPre[5] = {0};
+    static uint32_t showWifiStatusTick = 0;
+    static bool isWiFiStatusAlreadyShown = false;
+    static uint8_t sendServerFailCount = 0;
+    // Sau 1s sẽ bật cờ hiển thị trạng thái kết nối mạng
+    if((uint32_t)(esp_timer_get_time()/1000) - showWifiStatusTick > 2000){
+        showWifiStatusTick = (uint32_t)(esp_timer_get_time()/1000);
+        EventBits_t e = xEventGroupGetBits(evgGUI);
+        if(CHECKFLAG(e,GUI_EVT_PAGE_RUN_SHOW_NETWORK_STATUS) == true){
+            xEventGroupClearBits(evgGUI,SHIFT_BIT_LEFT(GUI_EVT_PAGE_RUN_SHOW_NETWORK_STATUS));
+            gui.clear();
+            vTaskDelay(20/portTICK_PERIOD_MS);
+            isWiFiStatusAlreadyShown = false;
+        }
+        else {
+            xEventGroupSetBits(evgGUI,SHIFT_BIT_LEFT(GUI_EVT_PAGE_RUN_SHOW_NETWORK_STATUS));
+            isWiFiStatusAlreadyShown = false;
+        }
+    }
+
+    e = xEventGroupGetBits(evgGUI);
+    if(CHECKFLAG(e,GUI_EVT_PAGE_RUN_SHOW_NETWORK_STATUS) == true){
+        if(isWiFiStatusAlreadyShown == true) return;
+        gui.clear();
+        vTaskDelay(20/portTICK_PERIOD_MS); // wait LCD to clear screen
+        if(OnlineManage_CheckEvent(ONLEVT_STA_GOT_IP)){
+            gui.print("WIFI CONNECTED",0,0);
+            gui.print(OnlineManage_GetStationSSID(),0,1);
+            if(OnlineManage_GetCodeHTTP() != HTTP_OK){// HTTP_OK
+                gui.print("Connect Server fail",0,2);
+                char s[20] = {0};
+                sprintf(s,"Err:%d",OnlineManage_GetCodeHTTP());
+                gui.print(s,0,3);
+                sendServerFailCount++;
+                ESP_LOGI("GUI","Send fail:%u",sendServerFailCount);
+                if(sendServerFailCount >= 50){
+                    sendServerFailCount = 0;
+                    wifi_manager_disconnect_async();
+                }
+            } 
+            else sendServerFailCount = 0;
+        }
+        else {
+            gui.print("WIFI NOT CONNECT",0,0);
+            char s[30] = "AP:";
+            strcat(s,DEFAULT_AP_SSID);
+            gui.print(s,0,1);
+            memset(s,0,strlen(s));
+            strcpy(s,"Pass:");
+            strcat(s,DEFAULT_AP_PASSWORD);
+            gui.print(s,0,2);
+            memset(s,0,strlen(s));
+            strcpy(s,"IP:");
+            strcat(s,DEFAULT_AP_IP);
+            gui.print(s,0,3);
+        }
+        isWiFiStatusAlreadyShown = true;
+        return;
+    }
+
+    // Hiển thị thông số bình thường trên LCD
+    char s[LCD_COLS] = {0};
+    float ams5195 = brdParam.GetPressureAMS5915();
+    float sp100 = brdParam.GetPressureSP100();
+    uint16_t *maxPressure = (uint16_t*)brdParam.GetValueAddress(PARAM_DP_HIGH);
+    uint16_t *minPressure = (uint16_t*)brdParam.GetValueAddress(PARAM_DP_LOW);
+    uint8_t pressureBarLevel = gui.CalculateLevelFromPressure(*maxPressure,*minPressure,ams5195);
+    gui.SetLevel(pressureBarLevel);
+    gui.OutputStatusLED(1);
+    gui.OutputErrorLED(0);
+    uint8_t currentVavleTrigger = brdParam.GetCurrentValveTrigger();
+    uint16_t valveStatus = brdParam.GetValveStatus();
+    RTC_t t = brdParam.GetRTC();
+    uint8_t lcdRow = 0;
+    int temp;
+    // In giá trị áp suất AMS5915
+    strcpy(s,"AMS5915:");
+    temp = sprintf(s + strlen(s),"%.2f",ams5195);
+    //Nếu số ô cần hiển thị nhỏ hơn trước đó thì xóa bớt các ô hiển thị thừa của giá trị cũ 
+    if((uint8_t)temp < valueLengthPre[lcdRow]){
+        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
+            strcat(s," ");
+        }
+        valueLengthPre[lcdRow] = temp;
+    }
+    else {
+        valueLengthPre[lcdRow] = temp;
+    }
+    gui.print(s,0,lcdRow);
+    gui.print("mbar",LCD_COLS - strlen("mbar"),lcdRow);
+    memset(s,0,strlen(s));
+    // In giá trị áp suất SP100
+    lcdRow++;
+    strcpy(s,"SP100:");
+    temp = sprintf(s + strlen(s),"%.2f",sp100);
+    //Nếu số ô cần hiển thị nhỏ hơn trước đó thì xóa bớt các ô hiển thị thừa của giá trị cũ 
+    if((uint8_t)temp < valueLengthPre[lcdRow]){
+        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
+            strcat(s," ");
+        }
+        valueLengthPre[lcdRow] = temp;
+    }
+    else {
+        valueLengthPre[lcdRow] = temp;
+    }
+    gui.print(s,0,lcdRow);
+    gui.print("MPa",LCD_COLS - strlen("MPa"),lcdRow);
+    memset(s,0,strlen(s));
+    // In thời gian thực
+    lcdRow++;
+    strcpy(s,"Time:");
+    temp = sprintf(s + strlen(s),"%u:%u:%u %u/%u",t.hour,t.minute,t.second,t.day,t.month);
+    //Nếu số ô cần hiển thị nhỏ hơn trước đó thì xóa bớt các ô hiển thị thừa của giá trị cũ 
+    if((uint8_t)temp < valueLengthPre[lcdRow]){
+        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
+            strcat(s," ");
+        }
+        valueLengthPre[lcdRow] = temp;
+    }
+    else {
+        valueLengthPre[lcdRow] = temp;
+    }
+    gui.print(s,0,lcdRow);
+    memset(s,0,strlen(s));
+    // In valve đang kích và trạng thái valve
+    lcdRow++;
+    strcpy(s,"Valve:");
+    temp = sprintf(s + strlen(s),"%u ",currentVavleTrigger + 1);
+    valveStatus > 0 ? strcat(s,"OK") : strcat(s,"Err");
+    if(valveStatus == 0){
+        gui.OutputErrorLED(1);
+        gui.OutputStatusLED(0);
+    }
+    if((uint8_t)temp < valueLengthPre[lcdRow]){
+        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
+            strcat(s," ");
+        }
+        valueLengthPre[lcdRow] = temp;
+    }
+    else {
+        valueLengthPre[lcdRow] = temp;
+    }
+    gui.print(s,0,lcdRow);
+    memset(s,0,strlen(s));
 }
 
 void HandleNextPageEvent(){
@@ -77,89 +233,22 @@ void HandleNextPageEvent(){
     }
 }
 
-void OnPageRun(){
-    if(gui.GetCurrentPage() != PAGE_RUN) return;
-    EventBits_t e = xEventGroupWaitBits(evgGUI,SHIFT_BIT_LEFT(GUI_EVT_UPDATE_VALUE_FROM_UART), pdTRUE, pdFALSE, 0);
-    if(CHECKFLAG(e,GUI_EVT_UPDATE_VALUE_FROM_UART) == false) return;
-    static uint8_t valueLengthPre[5] = {0};
-    char s[LCD_COLS] = {0};
-    float ams5195 = brdParam.GetPressureAMS5915();
-    float sp100 = brdParam.GetPressureSP100();
-    uint16_t *maxPressure = (uint16_t*)brdParam.GetValueAddress(PARAM_DP_HIGH);
-    uint16_t *minPressure = (uint16_t*)brdParam.GetValueAddress(PARAM_DP_LOW);
-    uint8_t pressureBarLevel = gui.CalculateLevelFromPressure(*maxPressure,*minPressure,ams5195);
-    gui.SetLevel(pressureBarLevel);
-    uint8_t currentVavleTrigger = brdParam.GetCurrentValveTrigger();
-    uint16_t valveStatus = brdParam.GetValveStatus();
-    RTC_t t = brdParam.GetRTC();
-    uint8_t lcdRow = 0;
-    int temp;
-    // In giá trị áp suất AMS5915
-    strcpy(s,"AMS5915:");
-    temp = sprintf(s + strlen(s),"%.2f",ams5195);
-    //Nếu số ô cần hiển thị nhỏ hơn trước đó thì xóa bớt các ô hiển thị thừa của giá trị cũ 
-    if((uint8_t)temp < valueLengthPre[lcdRow]){
-        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
-            strcat(s," ");
-        }
-        valueLengthPre[lcdRow] = temp;
-    }
-    else {
-        valueLengthPre[lcdRow] = temp;
-    }
-    gui.print(s,1,lcdRow);
-    gui.print("mbar",LCD_COLS - strlen("mbar"),lcdRow);
-    memset(s,0,strlen(s));
-    // In giá trị áp suất SP100
-    lcdRow++;
-    strcpy(s,"SP100:");
-    temp = sprintf(s + strlen(s),"%.2f",sp100);
-    //Nếu số ô cần hiển thị nhỏ hơn trước đó thì xóa bớt các ô hiển thị thừa của giá trị cũ 
-    if((uint8_t)temp < valueLengthPre[lcdRow]){
-        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
-            strcat(s," ");
-        }
-        valueLengthPre[lcdRow] = temp;
-    }
-    else {
-        valueLengthPre[lcdRow] = temp;
-    }
-    gui.print(s,1,lcdRow);
-    gui.print("MPa",LCD_COLS - strlen("MPa"),lcdRow);
-    memset(s,0,strlen(s));
-    // In thời gian thực
-    lcdRow++;
-    strcpy(s,"Time:");
-    temp = sprintf(s + strlen(s),"%u:%u:%u %u/%u",t.hour,t.minute,t.second,t.day,t.month);
-    //Nếu số ô cần hiển thị nhỏ hơn trước đó thì xóa bớt các ô hiển thị thừa của giá trị cũ 
-    if((uint8_t)temp < valueLengthPre[lcdRow]){
-        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
-            strcat(s," ");
-        }
-        valueLengthPre[lcdRow] = temp;
-    }
-    else {
-        valueLengthPre[lcdRow] = temp;
-    }
-    gui.print(s,1,lcdRow);
-    memset(s,0,strlen(s));
-    // In valve đang kích và trạng thái valve
-    lcdRow++;
-    strcpy(s,"Valve:");
-    temp = sprintf(s + strlen(s),"%u ",currentVavleTrigger + 1);
-    valveStatus > 0 ? strcat(s,"OK") : strcat(s,"Err");
-    if((uint8_t)temp < valueLengthPre[lcdRow]){
-        for(uint8_t i = temp; i < valueLengthPre[lcdRow]; i++){
-            strcat(s," ");
-        }
-        valueLengthPre[lcdRow] = temp;
-    }
-    else {
-        valueLengthPre[lcdRow] = temp;
-    }
-    gui.print(s,1,lcdRow);
-    memset(s,0,strlen(s));
+void SaveFlashAction()
+{
+    if(gui.GetCurrentPage() != PAGE_SETTING) return;
+    EventBits_t e;
+    e = xEventGroupWaitBits(evgGUI,
+    SHIFT_BIT_LEFT(GUI_EVT_WRITE_PARAMS_TO_FLASH), pdTRUE, pdFALSE, 0);
+    if(CHECKFLAG(e,GUI_EVT_WRITE_PARAMS_TO_FLASH) == false) return;
+    ESP_ERROR_CHECK(brdParam.SaveParamsValueToFlash());
+    gui.clear();
+    vTaskDelay(20/portTICK_PERIOD_MS);
+    gui.print("Save data",0,0);
+    vTaskDelay(2000/portTICK_PERIOD_MS);
+    gui.PrintParamsToLCD();
 }
+
+
 
 
 void HandleEventResetLCD(){
@@ -186,11 +275,13 @@ void GUI_LoadParamsToBuffer(){
     uint8_t currentParamDisplayIndex = gui.GetParamDisplayIndex();
     ParamID id;
     Parameter_t *pParam = NULL; //biến này sẽ dùng để nạp vào bộ đệm của GUI
-    // Reset bộ đệm mỗi khi nạp 4 thông số mới
-    gui.ResetBufferGUI();
+    
+    
 
     // Lấy ra thứ tự của các phần tử hiện tại và tiếp theo của Mảng ánh xạ thông số
     if(CHECKFLAG(e,GUI_EVT_REFRESH_NEXT_PARAMS_DISPLAY) == true) {
+        // Reset bộ đệm mỗi khi nạp 4 thông số mới
+        gui.ResetBufferGUI();
         // Load lần lượt 4 thông số liên tiếp vào bộ đệm GUI
         for(uint8_t i = 0; i < LCD_ROWS; i++){
             // dùng để kiểm tra các thông số tiếp theo có vượt quá phạm vi của Mảng ánh xạ thông số
@@ -215,6 +306,8 @@ void GUI_LoadParamsToBuffer(){
         }
     }
     else if (CHECKFLAG(e,GUI_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY) == true){
+        // Reset bộ đệm mỗi khi nạp 4 thông số mới
+        gui.ResetBufferGUI();
         // Load lần lượt 4 thông số liên tiếp vào bộ đệm GUI
         for(uint8_t i = 0; i < LCD_ROWS; i++){
             // dùng để kiểm tra các thông số tiếp theo có vượt quá phạm vi của Mảng ánh xạ thông số
@@ -248,8 +341,7 @@ void GUI_LoadParamsToBuffer(){
  * @brief Xử lý sự kiện tăng giảm giá trị thông số khi nhấn nút trên màn hình GUI
  */
 void HandleChangeValueEvent(){
-    if(gui.GetCurrentPage() != PAGE_SETTING) return;
-    if(gui.GetPointerNow() != IS_VALUE) return;
+    if(gui.GetCurrentPage() != PAGE_SETTING || gui.GetPointerNow() != IS_VALUE) return;
     EventBits_t e;
     // Kiểm tra nếu có sự kiện tăng hoặc giảm giá trị
     e = xEventGroupWaitBits(evgGUI,
@@ -257,15 +349,61 @@ void HandleChangeValueEvent(){
     SHIFT_BIT_LEFT(GUI_EVT_DECREASE_VALUE) 
     ,pdTRUE,pdFALSE,0);
     ParamID id = paramMappingDisplay[gui.GetParamDisplayIndex()];
-
     if(CHECKFLAG(e,GUI_EVT_INCREASE_VALUE) == true) {
         brdParam.IncreaseNextValue(id);
     }
     else if(CHECKFLAG(e,GUI_EVT_DECREASE_VALUE) == true) {
         brdParam.DecreasePreviousValue(id);
     }
+    else return;
+    
+    //Thực hiện in ra màn hình chỉ duy nhất giá trị thay đổi ở hàng thứ _py mà con trỏ màn hình đang trỏ tới
+
+    // Khởi tạo bộ đệm chuỗi chứa giá trị cần thay đổi trên màn hình
+    char strBuffer[10] = {0};
+    // Lấy thông số từ BoardParameter của phần tử thứ id
+    Parameter_t *pParam = NULL; //biến này sẽ dùng để nạp vào bộ đệm của GUI
+    int nowOccupyScreenSlot = 0; // biến này dùng để chứa số ô màn hình chiếm dụng để in ra giá trị của thông số
+    // Nếu không reset board thì giá trị hợp lệ
+    ESP_ERROR_CHECK(brdParam.GetParameter(&pParam,id));
+    // Lúc này thay vì in theo index i thì sẽ in theo id
+    if(pParam->dataType == TYPE_STRING){
+        // Tạo con trỏ chuỗi lấy giá trị từ con trỏ cấp 2 ép kiểu từ void* cộng với thứ tự phần tử index để trỏ tới chuỗi cần lấy giá trị
+        const char *strVal = *((const char**)pParam->value + pParam->index);
+        strcpy(strBuffer,strVal);
+        nowOccupyScreenSlot = (uint8_t)strlen(strVal);
+    } 
+    else {
+        // ép kiểu con trỏ void* của value về uint16_t* để lấy ra giá trị của thông số
+        uint16_t *value = (uint16_t*)pParam->value;
+        nowOccupyScreenSlot = (uint8_t)sprintf(strBuffer,"%d",*value);
+    }
+    // Nếu có đơn vị đo thì ghép vào giá trị thông số
+    if(pParam->unit != NULL){
+        const char *unit = NULL;
+        unit = pParam->unit;
+        strcat(strBuffer,unit);
+    }
+    // Kiểm tra số ô màn hình đang chiếm dụng hiện tại so với lúc refresh màn hình thông số có nhỏ hơn không
+    uint8_t preSlot = gui.GetPreValueOccupyScreenSlot(gui.GetPy());
+    if(nowOccupyScreenSlot != preSlot){
+        if(nowOccupyScreenSlot < preSlot){
+            // Xóa bớt các ô thừa
+            for(uint8_t j = nowOccupyScreenSlot; j < preSlot; j++){
+                // Chỉ thêm slot rỗng vào sau đơn vị đo (nếu có), không ảnh hưởng tới việc hiển thị đơn vị đo
+                strcat(strBuffer," ");
+            }
+            // Cập nhật ô chiếm dụng màn hình mới 
+        }
+        gui.SetPreValueOccupyScreenSlot(nowOccupyScreenSlot,gui.GetPy());
+    }
+
+    gui.print(strBuffer,POINTER_SLOT + LENGTH_OF_PARAM + POINTER_SLOT,gui.GetPy());
+
 
 }
+
+
 
 void InitGUI()
 {

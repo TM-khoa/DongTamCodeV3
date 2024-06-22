@@ -3,7 +3,6 @@
 #include "../main.h"
 #include "Protocol.h"
 #include "UART.h"
-
 typedef struct PressureTwoSensorValue {
 		float sensorAMS5915;
 		float sensorSP100;
@@ -26,7 +25,7 @@ public:
      * @param id Mã định danh thông số cần gửi.
      * @param getSetFlag Cờ báo yêu cầu đối tượng sẽ nhận dữ liệu hay phản hồi dữ liệu về.
      */
-    void TransmitMessage(uart_port_t port,ProtocolListID id, GetSetFlag getSetFlag){
+    void TransmitMessage(uart_port_t port,ProtocolID id, GetSetFlag getSetFlag){
         // Lấy thông tin đối số cần truyền đi
         ArgumentOfProtocolList_t arg = Protocol::GetArgumentID(id);
         if(arg.pArg == NULL) Protocol::JumpToError(PROTOCOL_ERR_REFERENCE_PAYLOAD_NOT_FOUND);
@@ -48,7 +47,7 @@ public:
      * @param id Mã định danh thông số cần gửi.
      * @param getSetFlag Cờ báo yêu cầu đối tượng sẽ nhận dữ liệu hay phản hồi dữ liệu về.
      */
-    void TransmitMessage(uart_port_t port, ProtocolListID id, GetSetFlag getSetFlag, void *data, uint16_t sizeOfData){
+    void TransmitMessage(uart_port_t port, ProtocolID id, GetSetFlag getSetFlag, void *data, uint16_t sizeOfData){
         if(data == NULL) Protocol::JumpToError(PROTOCOL_ERR_REFERENCE_PAYLOAD_NOT_FOUND);
         // Tính toán kích thước frame truyền tương ứng với kích thước sizeOfData
         uint16_t frameDataLength = PROTOCOL_TOTAL_LENGTH(sizeOfData);
@@ -85,7 +84,6 @@ private:
 };
 
 void TaskUART(void *pvParameters);
-void ReceivedMessage(ProtocolListID ID, GetSetFlag getSetFlag);
 void ErrorMessage(ProtocolErrorCode err);
 #endif
 

@@ -70,7 +70,7 @@ private:
         if((((gpio == BTN_UP) || (gpio == BTN_DOWN_RIGHT)) && isAllowToSpeedUp) 
         ) {
             vTaskDelay(delay/portTICK_PERIOD_MS);
-            delayCountLoop += 1;
+            delayCountLoop++;
             /**
              *  if user only press BTN_UP and BTN_DOWN_RIGHT just only one,
              * interpret it as normal button and not send notify, if user holding down button and DelayCountLoop increase, 
@@ -86,7 +86,7 @@ private:
           * Khi nhấn giữ 5s nút Menu thì sẽ reset LCD nếu bị lỗi hiển thị  
           * @note Lưu ý không được để ESP_LOGI trong này, nếu không LCD sẽ bị lỗi ghi I2C vào PCF8574  (dự đoán có thể do tràn stack)
           * */ 
-        if(gpio == BTN_MENU){
+        else if(gpio == BTN_MENU){
             vTaskDelay(200/portTICK_PERIOD_MS);
             resetWhenErrorLCD_Count++;
             // Wait for 5 seconds or above to send notify 
@@ -104,7 +104,9 @@ private:
         /**
          * Nếu chương trình quét nhiều lần đạt đến DELAY_COUNT_LOOP_THRESHOLD thì bắt đầu giảm delay
         */
-        if(delayCountLoop >= DELAY_COUNT_LOOP_THRESHOLD && delay > BTN_HOLD_DELAY_MIN){
+        if(delayCountLoop >= DELAY_COUNT_LOOP_THRESHOLD 
+        && delay > BTN_HOLD_DELAY_MIN
+        ){
             delayCountLoop = 0;
             int temp = delay - BTN_HOLD_DELAY_DECREASE_STEP;
             // Saturate low delay speed

@@ -9,6 +9,7 @@
 #include "wifi_manager.h"
 #include "../BoardParameter.h"
 #include "../Communication/MessageHandle.h"
+#include "POSTGET.h"
 
 
 typedef enum OnlineEvent{
@@ -26,6 +27,9 @@ esp_err_t OnlineManage_RequestSyncTimeFromServerNTP();
 bool OnlineManage_CheckEvent(OnlineEvent evt);
 void OnlineManage_SetEvent(OnlineEvent evt);
 TaskHandle_t* OnlineManage_GetOnlineTaskHandle();
+char* OnlineManage_GetStationSSID();
+HTTP_CODE_e OnlineManage_GetCodeHTTP();
+
 class OnlineManage {
 private:
     bool isAllowSyncTime = false;

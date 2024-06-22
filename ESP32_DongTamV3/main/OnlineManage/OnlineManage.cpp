@@ -3,7 +3,7 @@
 #include "stdlib.h"
 #include "../GUI/PressureBar.h"
 #include "../GUI/GUI.h"
-#include "POSTGET.h"
+
 
 
 static OnlineManage onlmng;
@@ -14,6 +14,8 @@ static void WifiDisconnectCallback(void *pvParameter);
 static void TimeServerSyncNotifyCallback(struct timeval *tv);
 static void SendTimeSyncToSTM32();
 static void SendDataToServer();
+static HTTP_CODE_e http_code;
+static char stationSSID[32] = {0};
 extern BoardParameter brdParam;
 extern MessageHandle mesg;
 
@@ -86,7 +88,7 @@ static void SendTimeSyncToSTM32()
         ,rtc.day
         ,rtc.month
         ,rtc.year);
-        mesg.TransmitMessage(UART_NUM_2,PROTOCOL_ID_RTC_TIME,SET_DATA_TO_THIS_DEVICE,(void*)&rtc,sizeof(rtc));
+        mesg.TransmitMessage(UART_NUM_2,(ProtocolID)PROTOCOL_ID_RTC_TIME,SET_DATA_TO_THIS_DEVICE,(void*)&rtc,sizeof(rtc));
     }
     xEventGroupClearBits(evgOnline,SHIFT_BIT_LEFT(ONLEVT_TIME_SYNC));
 }
@@ -94,33 +96,30 @@ static void SendTimeSyncToSTM32()
 static void SendDataToServer() 
 {
     EventBits_t e = xEventGroupGetBits(evgOnline);
-    
-    if(CHECKFLAG(e,ONLEVT_STA_GOT_IP) == false) return;
-    if(CHECKFLAG(e,ONLEVT_SEND_DATA_TO_SERVER) == true){
-        ESP_LOGW("Send Data", "to server");
-        uint16_t *dpHigh = (uint16_t*)brdParam.GetValueAddress(PARAM_DP_HIGH);
-        uint16_t *dpLow = (uint16_t*)brdParam.GetValueAddress(PARAM_DP_LOW);
-        float pAMS5915 = brdParam.GetPressureAMS5915();
-        uint8_t currentValve = brdParam.GetCurrentValveTrigger();
-        uint16_t valveStatus = brdParam.GetValveStatus();
-        PressureBar pBar;
-        uint8_t pressureLevel = pBar.CalculateLevelFromPressure(*dpHigh,*dpLow,pAMS5915);
-        char s[300] = {0};
-        RTC_t t = brdParam.GetRTC();
-        snprintf(s,300,  
-        "{'IMEI': \"AC67B2F6E568\", 'Power':1, 'FAN':1, 'ODCMode':1, 'ValveError':%d, 'VanKich':%u, 'DeltaPH':%d, 'DeltaP':%.2f,'DeltaPL':%d,'LED10Bar':%u,'RTC': \"%d/%d/%d %d:%d:%d\"}",
-        valveStatus > 0 ? 1 : 0,
-        currentValve,
-        *dpHigh,
-        pAMS5915,
-        *dpLow,
-        pressureLevel,
-        t.day, t.month, t.year + 2000, t.hour, t.minute, t.second);
-        HTTP_CODE_e http_code = http_post((char*)URL_POST_IOTVISION_DONGTAM,s);
-        if(http_code != HTTP_OK) ESP_LOGE("HTTP Send","Err:%d", http_code);
-        xEventGroupClearBits(evgOnline,ONLEVT_SEND_DATA_TO_SERVER);
-        vTaskDelay(3000/portTICK_PERIOD_MS);
-    }
+    if(CHECKFLAG(e,ONLEVT_STA_GOT_IP) == false
+    || CHECKFLAG(e,ONLEVT_SEND_DATA_TO_SERVER) == false) return;
+    uint16_t *dpHigh = (uint16_t*)brdParam.GetValueAddress(PARAM_DP_HIGH);
+    uint16_t *dpLow = (uint16_t*)brdParam.GetValueAddress(PARAM_DP_LOW);
+    float pAMS5915 = brdParam.GetPressureAMS5915();
+    uint8_t currentValve = brdParam.GetCurrentValveTrigger();
+    uint16_t valveStatus = brdParam.GetValveStatus();
+    PressureBar pBar;
+    uint8_t pressureLevel = pBar.CalculateLevelFromPressure(*dpHigh,*dpLow,pAMS5915);
+    char s[300] = {0};
+    RTC_t t = brdParam.GetRTC();
+    snprintf(s,300,  
+    "{'IMEI': \"AC67B2F6E568\", 'Power':1, 'FAN':1, 'ODCMode':1, 'ValveError':%d, 'VanKich':%u, 'DeltaPH':%d, 'DeltaP':%.2f,'DeltaPL':%d,'LED10Bar':%u,'RTC': \"%d/%d/%d %d:%d:%d\"}",
+    valveStatus > 0 ? 1 : 0,
+    currentValve,
+    *dpHigh,
+    pAMS5915,
+    *dpLow,
+    pressureLevel,
+    t.day, t.month, t.year + 2000, t.hour, t.minute, t.second);
+    http_code = http_post((char*)URL_POST_IOTVISION_DONGTAM,s);
+    if(http_code != HTTP_OK) ESP_LOGE("HTTP Send","Err:%d", http_code);
+    xEventGroupClearBits(evgOnline,ONLEVT_SEND_DATA_TO_SERVER);
+    vTaskDelay(3000/portTICK_PERIOD_MS);
 }
 
 esp_err_t OnlineManage_RequestSyncTimeFromServerNTP()
@@ -131,6 +130,18 @@ esp_err_t OnlineManage_RequestSyncTimeFromServerNTP()
     xEventGroupClearBits(evgOnline,SHIFT_BIT_LEFT(ONLEVT_TIME_SYNC));
     onlmng.AllowSyncTime();
     return ESP_OK;
+}
+
+char* OnlineManage_GetStationSSID()
+{
+    wifi_config_t *wifiStation = wifi_manager_get_wifi_sta_config();
+    strcpy(stationSSID,(const char*)wifiStation->sta.ssid);
+    return stationSSID; 
+}
+
+HTTP_CODE_e OnlineManage_GetCodeHTTP()
+{
+    return http_code;
 }
 
 bool OnlineManage_CheckEvent(OnlineEvent evt)

@@ -51,7 +51,6 @@ typedef enum Page{
 
 typedef enum EventGUI{
     GUI_EVT_WRITE_PARAMS_TO_FLASH,
-    GUI_EVT_GET_PARAMS_FROM_FLASH,
     GUI_EVT_VALUE_REACH_LIMIT,
     GUI_EVT_REFRESH_NEXT_PARAMS_DISPLAY,
     GUI_EVT_REFRESH_PREVIOUS_PARAMS_DISPLAY,
@@ -139,8 +138,9 @@ public:
 
 
     /**
-     * @brief Trả về phần tử thứ _paramDisplayIndex của Mảng ánh xạ thông số.
+     * @brief - Trả về phần tử hiện tại con trỏ đang trỏ tới Mảng ánh xạ thông số.
      * Giá trị từ phần tử này cho biết ID (ParamID) của thông số cần tìm.
+     * @brief - Go to definition để xem ví dụ
      * @example: uint8_t i = GUI_Navigator::GetParamDisplayIndex(); 
      * ParamID id = paramMappingDisplay[i]; // lấy id thông số từ phần tử
      * @note: Đây chỉ là ví dụ, cần phải khởi tạo class GUI_Navigator thì mới sử dụng được phương thức GetParamDisplayIndex.
@@ -239,8 +239,7 @@ public:
      * @brief Chờ sự kiện từ nút nhấn GUI do người dùng nhấn và xử lý tương ứng
      * @param e Các sự kiện thuộc enum EventButton
      */
-    void WaitForEvent(EventBits_t e){
-        ESP_LOGW("Navigator","event:%lu, LCD reset event %lu",e,SHIFT_BIT_LEFT(EVT_BTN_LCD_RESET));
+    void WaitForButtonEvent(EventBits_t e){
         HandleEvent(e,SHIFT_BIT_LEFT(EVT_BTN_MENU),&GUI_Navigator::MoveNextPage,&GUI_Navigator::PointerNowIsKeyword);
         if(_page == PAGE_SETTING){
             HandleEvent(e,SHIFT_BIT_LEFT(EVT_BTN_SET),&GUI_Navigator::PointerNowIsValue,&GUI_Navigator::SendEventSaveParamsToFlash);

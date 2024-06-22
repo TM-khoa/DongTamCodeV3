@@ -27,6 +27,8 @@ private:
 
     // Chỉ nắm giữ địa chỉ trỏ tới thông số, không tạo thêm cấu trúc dữ liệu chứa thông số đó
     Parameter_t *_paramDisplayBuffer[4];
+    // Cho biết số ô màn hình cần chiếm để hiển thị giá trị thông số trước đó, nếu số ô hiện tại chiếm dụng nhỏ hơn số ô trước đó thì sẽ xóa bớt ô thừa đi
+    uint8_t _preValueOccupyScreenSlot[4];
 public:
 
     /**
@@ -48,7 +50,30 @@ public:
     void ResetBufferGUI(){
         for(uint8_t i = 0; i < LCD_ROWS; i++){
             _paramDisplayBuffer[i] = NULL;
+            _preValueOccupyScreenSlot[i] = 0;
+            ESP_LOGW("GUI","ResetBuffer");
         }
+    }
+
+
+    /**
+     * @brief Trả về số ô màn hình mà giá trị thông số đang chiếm dụng ở hàng mà con trỏ màn hình đang trỏ tới
+     * @param py Hàng con trỏ đang trỏ tới
+     * @return uint8_t
+     */
+    uint8_t GetPreValueOccupyScreenSlot(uint8_t py){return _preValueOccupyScreenSlot[py];}
+
+    /**
+     * @brief Cập nhật số ô màn hình chiếm dụng bởi giá trị thông số tại hàng mà con trỏ màn hình đang trỏ tới
+     * @param slot uint8_t 
+     * @param py Hàng con trỏ đang trỏ tới
+     * @return ESP_ERR_INVALID_ARG nếu py >= 4 và slot + LENGTH_OF_PARAM > LCD_COLS, ESP_OK nếu không có lỗi
+     */
+    esp_err_t SetPreValueOccupyScreenSlot(uint8_t slot, uint8_t py){
+        // Nếu số hàng lớn hơn hàng quy định LCD hoặc số ô chiếm dụng vượt quá số ô LCD cho phép thì lỗi
+        if(py >= LCD_ROWS || slot + LENGTH_OF_PARAM > LCD_COLS) return ESP_ERR_INVALID_ARG;
+        _preValueOccupyScreenSlot[py] = slot;
+        return ESP_OK;
     }
 
     void PrintParamsToLCD(){
@@ -67,11 +92,12 @@ public:
                 // Tạo con trỏ chuỗi lấy giá trị từ con trỏ cấp 2 ép kiểu từ void* cộng với thứ tự phần tử index để trỏ tới chuỗi cần lấy giá trị
                 const char *strVal = *((const char**)_paramDisplayBuffer[i]->value + _paramDisplayBuffer[i]->index);
                 strcpy(strBuffer,strVal);
+                _preValueOccupyScreenSlot[i] = (uint8_t)strlen(strVal);
             } 
             else {
                 // ép kiểu con trỏ void* của value về uint16_t* để lấy ra giá trị của thông số
                 uint16_t *value = (uint16_t*)_paramDisplayBuffer[i]->value;
-                sprintf(strBuffer,"%d",*value);
+                _preValueOccupyScreenSlot[i] = (uint8_t)sprintf(strBuffer,"%d",*value);
             }
             // Nếu có đơn vị đo thì ghép vào giá trị thông số
             if(_paramDisplayBuffer[i]->unit != NULL){
