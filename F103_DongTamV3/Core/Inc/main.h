@@ -36,7 +36,16 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+typedef enum ProtocolListID {
+	PROTOCOL_ID_HANDSHAKE,
+	PROTOCOL_ID_VALVE,
+	PROTOCOL_ID_SETTING_PARAMS, // bao gồm totalValve, pulseTime, intervalTime, cycleIntervalTime
+	PROTOCOL_ID_RTC_TIME,
+	PROTOCOL_ID_PRESSURE,
+	PROTOCOL_ID_ON_PROCESS,
+	PROTOCOL_ID_ERROR,
+	PROTOCOL_ID_END,
+} ProtocolListID;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
