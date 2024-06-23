@@ -26,8 +26,15 @@ typedef struct ValveData {
 		uint8_t currentValveTrigger;
 } ValveData;
 
-void HandleMessageCallback(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, ProtocolListID id, GetSetFlag getSetFlag);
+typedef struct SettingParameter {
+		uint8_t totalValve;
+		uint16_t pulseTime;
+		uint16_t intervalTime;
+		uint8_t cycleIntervalTime;
+} SettingParameter;
 
+void HandleMessageCallback(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, ProtocolID id, GetSetFlag getSetFlag);
+void MessageError(ProtocolErrorCode err);
 class MessageHandle: public Protocol {
 	private:
 		bool _isHandShake;
@@ -39,13 +46,14 @@ class MessageHandle: public Protocol {
 		pfnReceive pReceive;
 		uint16_t _handshakeCode;
 		PressureTwoSensorValue _pressure;
+		SettingParameter _settingParams;
 	public:
 		MessageHandle() {
 			pSend = &HAL_UART_Transmit;
 			pReceive = &HAL_UART_Receive_IT;
 			Protocol::RegisterStorageBuffer(_txBuf, sizeof(_txBuf), _rxBuf, sizeof(_rxBuf));
 			Protocol::RegisterReceivedCallbackEvent(&HandleMessageCallback);
-
+			Protocol::RegisterErrorEvent(&MessageError);
 		}
 
 		void HandleFramDataInterrupt(UART_HandleTypeDef *huart) {
@@ -60,6 +68,7 @@ class MessageHandle: public Protocol {
 				else
 					JumpToError(PROTOCOL_ERR_OUT_OF_BUFFER_SIZE);
 			}
+
 			else {
 				Protocol::DecodeFrameAndCheckCRC();
 				isOnFrameReceived = false;
@@ -76,11 +85,17 @@ class MessageHandle: public Protocol {
 			pReceive(*(portArray + 0), _rxBuf, 1);
 			pReceive(*(portArray + 1), _rxBuf, 1);
 
-			Protocol::RegisterArgument((void*) &_pressure, sizeof(PressureTwoSensorValue), PROTOCOL_ID_PRESSURE);
-			Protocol::RegisterArgument((void*) &_handshakeCode, 0, PROTOCOL_ID_HANDSHAKE);
-			SendFrame(PROTOCOL_ID_HANDSHAKE, GET_DATA_FROM_THIS_DEVICE);
+			Protocol::RegisterArgument((void*) &_pressure, sizeof(PressureTwoSensorValue), (uint8_t) PROTOCOL_ID_PRESSURE);
+			Protocol::RegisterArgument((void*) &_handshakeCode, sizeof(_handshakeCode), (uint8_t) PROTOCOL_ID_HANDSHAKE);
+			Protocol::RegisterArgument((void*) &_settingParams, sizeof(_settingParams), PROTOCOL_ID_SETTING_PARAMS);
+			SendFrame((uint8_t) PROTOCOL_ID_HANDSHAKE, GET_DATA_FROM_THIS_DEVICE);
 
 		}
+
+		SettingParameter GetSettingParams() {
+			return _settingParams;
+		}
+
 		void SetPortUART(UART_HandleTypeDef *huart) {
 			_targetUART = huart;
 		}
@@ -95,7 +110,7 @@ class MessageHandle: public Protocol {
 		void UpdatePressureAndSend(UART_HandleTypeDef *huart, float pAMS5915, float pSP100) {
 			_pressure.sensorAMS5915 = pAMS5915;
 			_pressure.sensorSP100 = pSP100;
-			SendFrame(PROTOCOL_ID_PRESSURE, SET_DATA_TO_THIS_DEVICE);
+			SendFrame((uint8_t) PROTOCOL_ID_PRESSURE, SET_DATA_TO_THIS_DEVICE);
 		}
 
 		/**
@@ -105,7 +120,7 @@ class MessageHandle: public Protocol {
 		 * @param protocolID Mã định dạng khung truyền
 		 * @param getSetFlag Cờ báo yêu cầu đối tượng sẽ nhận dữ liệu hay phản hồi dữ liệu về.
 		 */
-		void SendFrame(ProtocolListID protocolID, GetSetFlag getSetFlag) {
+		void SendFrame(ProtocolID protocolID, GetSetFlag getSetFlag) {
 			Protocol::MakeFrame(protocolID, getSetFlag);
 			FrameData fd = GetFrameDataInfo();
 			pSend(_targetUART, _txBuf, fd.totalLength, HAL_MAX_DELAY);
@@ -119,7 +134,7 @@ class MessageHandle: public Protocol {
 		 * @param protocolID Mã định dạng khung truyền
 		 * @param getSetFlag Cờ báo yêu cầu đối tượng sẽ nhận dữ liệu hay phản hồi dữ liệu về.
 		 */
-		void SendFrame(void *payload, uint16_t sizeOfPayload, ProtocolListID protocolID, GetSetFlag getSetFlag) {
+		void SendFrame(void *payload, uint16_t sizeOfPayload, ProtocolID protocolID, GetSetFlag getSetFlag) {
 			Protocol::MakeFrame(payload, sizeOfPayload, protocolID, getSetFlag);
 			FrameData fd = GetFrameDataInfo();
 			pSend(_targetUART, _txBuf, fd.totalLength, HAL_MAX_DELAY);

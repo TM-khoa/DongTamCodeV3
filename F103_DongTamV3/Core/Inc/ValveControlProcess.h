@@ -54,8 +54,8 @@ class ValveControl: public ValveFeedback {
 		uint16_t _timerTick;
 		uint16_t _pulseTime; // thời gian kích van, tính bằng ms
 		uint16_t _intervalTime; // thời gian nghỉ giữa 2 lần kích van, tính bằng s
-		uint8_t _valveRemainToTrigger; // số van còn lại trong chu trình cần phải kích
 		uint8_t _cycleIntervalTime; //thời gian nghỉ giữa 2 chu kỳ kích van (khoảng nghỉ sau khi kích van cuối cùng và bắt đầu chu trình mới), tính bằng s
+		uint8_t _valveRemainToTrigger; // số van còn lại trong chu trình cần phải kích
 		uint8_t _totalValve;
 		uint16_t _valveStatus;
 		bool _isOnProcess, _allowToSendData;
@@ -73,10 +73,10 @@ class ValveControl: public ValveFeedback {
 			AssignControlPin(_74HC595_CLK_GPIO_Port, _74HC595_CLK_Pin, HC595_CLK);
 			AssignControlPin(_74HC595_DATA_GPIO_Port, _74HC595_DATA_Pin, HC595_DS);
 			AssignControlPin(_74HC595_STORE_GPIO_Port, _74HC595_STORE_Pin, HC595_LATCH);
-			_totalValve = 16;
+			_totalValve = 3;
 			_pulseTime = 50;
-			_intervalTime = 1;
-			_cycleIntervalTime = 3;
+			_intervalTime = 6;
+			_cycleIntervalTime = 10;
 
 			if (_totalValve > MAX_NUM_VAN)
 				while (1);
@@ -222,6 +222,10 @@ class ValveControl: public ValveFeedback {
 		}
 
 		void ValveProcessRun();
+
+		bool GetValveProcess() {
+			return _isOnProcess;
+		}
 		/**
 		 * @brief Cho phép khởi động chu trình kích van
 		 *
@@ -244,6 +248,7 @@ class ValveControl: public ValveFeedback {
 		bool IsOnProcess() {
 			return _isOnProcess;
 		}
-};
+}
+;
 
 #endif /* INC_VALVECONTROLPROCESS_H_ */

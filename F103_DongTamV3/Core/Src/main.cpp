@@ -151,7 +151,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		pressureCount++;
 		if (rtcCount >= 100) {
 			tCurrent = GetCurrentTimeFromTick(tPCF8563, rtcTick_s);
-			mesg.SendFrame(PROTOCOL_ID_RTC_TIME, SET_DATA_TO_THIS_DEVICE);
+			mesg.SendFrame((uint8_t) PROTOCOL_ID_RTC_TIME, SET_DATA_TO_THIS_DEVICE);
 			rtcCount = 0;
 		}
 		if (pressureCount >= 150) {
@@ -219,7 +219,7 @@ int main(void) {
 	mesg.Begin(&huart1, NULL);
 	mesg.RegisterArgument((void*) &tCurrent, sizeof(RTC_t), PROTOCOL_ID_RTC_TIME);
 	vf.GetInputValue();
-	vc.StartValveProcess();
+//	vc.StartValveProcess();
 	HAL_TIM_Base_Start_IT(&htim3);
 	HAL_GPIO_WritePin(BlueLED_GPIO_Port, BlueLED_Pin, GPIO_PIN_SET);
 	HAL_Delay(500);
