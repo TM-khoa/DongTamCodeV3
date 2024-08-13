@@ -13,6 +13,13 @@ typedef struct ValveData {
 		uint8_t currentValveTrigger;
 } ValveData;
 
+typedef struct SettingParameter {
+		uint8_t totalValve;
+		uint16_t pulseTime;
+		uint16_t intervalTime;
+		uint8_t cycleIntervalTime;
+} SettingParameter;
+
 class MessageHandle: public PortUART {
 public:
     void Begin();
@@ -64,8 +71,8 @@ public:
     void HandleErrorMessage(ProtocolErrorCode err)
     {
         if(_isHandshake == false) return;
-        ESP_LOGE("ErrorMesg","%d",err);
-        esp_restart();
+        ESP_LOGE("MesgHandle","err:%d",err);
+        ESP_ERROR_CHECK(ESP_ERR_INVALID_ARG);
         while(1);
     }
 
@@ -74,6 +81,13 @@ public:
 
     ValveData GetValveData(){return _vData;}
 
+    void LoadSettingParam(uint8_t totalValve, uint16_t pulseTime, uint16_t intervalTime, uint16_t cycleIntervalTime)    {
+        _settingParams.totalValve = totalValve;
+        _settingParams.intervalTime = intervalTime;
+        _settingParams.cycleIntervalTime = cycleIntervalTime;
+        _settingParams.pulseTime = pulseTime;
+    }
+
     void SetHandshake(bool handshake) {_isHandshake = handshake;}
     bool IsHandshake(){ return _isHandshake;}
 private:
@@ -81,6 +95,7 @@ private:
     bool _isHandshake;
     PressureTwoSensorValue _pressure;
     ValveData _vData;
+    SettingParameter _settingParams;
 };
 
 void TaskUART(void *pvParameters);

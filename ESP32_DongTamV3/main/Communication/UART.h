@@ -83,7 +83,7 @@ public:
                     uint8_t *dtmp = (uint8_t*) malloc(_uartEvent.size + 1);
                     uart_read_bytes(_uartTarget, dtmp, _uartEvent.size, portMAX_DELAY);
                     // ESP_LOGI("Receive","EventSize:%d",_uartEvent.size);
-                    // for(uint8_t i = 0; i < byteRead; i++){
+                    // for(uint8_t i = 0; i < _uartEvent.size; i++){
                     //     ESP_LOGI("Byte","0x%x",*(dtmp+i));
                     // }
                     Protocol::DecodeFrameAndCheckCRC(dtmp,_uartEvent.size);
@@ -121,7 +121,7 @@ public:
         _uartTarget = port;
     }
     
-    uart_port_t GetPortCurrent(){
+    uart_port_t GetCurrentPort(){
         return _uartTarget;
     }
 

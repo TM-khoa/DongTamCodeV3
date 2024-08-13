@@ -140,7 +140,7 @@ public:
     /**
      * @brief - Trả về phần tử hiện tại con trỏ đang trỏ tới Mảng ánh xạ thông số.
      * Giá trị từ phần tử này cho biết ID (ParamID) của thông số cần tìm.
-     * @brief - Go to definition để xem ví dụ
+     * @brief - Go to definition (vscode) để xem ví dụ
      * @example: uint8_t i = GUI_Navigator::GetParamDisplayIndex(); 
      * ParamID id = paramMappingDisplay[i]; // lấy id thông số từ phần tử
      * @note: Đây chỉ là ví dụ, cần phải khởi tạo class GUI_Navigator thì mới sử dụng được phương thức GetParamDisplayIndex.

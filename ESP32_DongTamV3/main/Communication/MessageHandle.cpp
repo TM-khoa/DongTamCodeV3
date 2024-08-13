@@ -16,14 +16,35 @@ void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, Prot
     if(id == PROTOCOL_ID_HANDSHAKE){
         // ESP_LOGI("HandShake","Receive");
         mesg.SetHandshake(true);   
+        mesg.LoadSettingParam(
+            *(uint16_t*)brdParam.GetValueAddress(PARAM_TOTAL_VALVE),
+            *(uint16_t*)brdParam.GetValueAddress(PARAM_PULSE_TIME),
+            *(uint16_t*)brdParam.GetValueAddress(PARAM_INTERVAL_TIME),
+            *(uint16_t*)brdParam.GetValueAddress(PARAM_CYCLE_INTERVAL_TIME)
+        );
+        ESP_LOGI("MesgHandle","SendSettingParam, totalValve: %u, pulseTime: %u,intervalTime: %u, cycleIntervalTime: %u,",
+        *(uint16_t*)brdParam.GetValueAddress(PARAM_TOTAL_VALVE),
+        *(uint16_t*)brdParam.GetValueAddress(PARAM_PULSE_TIME),
+        *(uint16_t*)brdParam.GetValueAddress(PARAM_INTERVAL_TIME),
+        *(uint16_t*)brdParam.GetValueAddress(PARAM_CYCLE_INTERVAL_TIME));
+        mesg.TransmitMessage(UART_NUM_2,PROTOCOL_ID_SETTING_PARAMS,SET_DATA_TO_THIS_DEVICE);
+        vTaskDelay(10/portTICK_PERIOD_MS);
+        bool onProcessStatus = brdParam.GetOnProcessValveStatus();
+        mesg.TransmitMessage(UART_NUM_2,PROTOCOL_ID_ON_PROCESS,SET_DATA_TO_THIS_DEVICE,(void*)&onProcessStatus,sizeof(onProcessStatus));
     } 
     else if (mesg.IsHandshake() == false) {
         // ESP_LOGW("HandShake","Send Request");
-        mesg.TransmitMessage(mesg.GetPortCurrent(),PROTOCOL_ID_HANDSHAKE,GET_DATA_FROM_THIS_DEVICE);
+        mesg.TransmitMessage(mesg.GetCurrentPort(),PROTOCOL_ID_HANDSHAKE,GET_DATA_FROM_THIS_DEVICE);
         return;
     }
     switch (id){
-    
+    case PROTOCOL_ID_ON_PROCESS:
+        if(getSetFlag == SET_DATA_TO_THIS_DEVICE){
+            bool isOnProcessStatus;
+            mesg.GetValueFromPayload((void*)&isOnProcessStatus,(uint8_t)sizeof(bool));
+            brdParam.IsOnProcessValve(isOnProcessStatus);
+        }
+        break;
     case PROTOCOL_ID_VALVE:
         if(getSetFlag == SET_DATA_TO_THIS_DEVICE){
             mesg.GetValueFromPayload(inputBuffer,sizeOfInputBuffer);
@@ -34,24 +55,8 @@ void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, Prot
             GUI_SetEvent(GUI_EVT_UPDATE_VALUE_FROM_UART);
             // Khi nào van kích thì mới gửi thông tin lên server
             OnlineManage_SetEvent(ONLEVT_SEND_DATA_TO_SERVER);
-
         }
-        break;            
-    case PROTOCOL_ID_IS_ON_PROCESS:
-        
         break;
-    case PROTOCOL_ID_PULSE_TIME:
-        
-        break;
-    case PROTOCOL_ID_INTERVAL_TIME:
-        
-        break;                    
-    case PROTOCOL_ID_CYCLE_INTERVAL_TIME:
-        
-        break;            
-    case PROTOCOL_ID_TOTAL_VALVE:
-        
-        break;   
     case PROTOCOL_ID_PRESSURE:
     {
         if(getSetFlag == SET_DATA_TO_THIS_DEVICE){         
@@ -72,6 +77,7 @@ void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, Prot
             // Những thông số cần hiển thị lên màn hình thì mới set event
             GUI_SetEvent(GUI_EVT_UPDATE_VALUE_FROM_UART);
             OnlineManage_SetEvent(ONLEVT_RTC_RECEIVED_FROM_STM32);
+            GUI_SetEvent(GUI_EVT_UPDATE_VALUE_FROM_UART);
             // RTC_t t = brdParam.GetRTC();
             // ESP_LOGI("RTC","h:%u, m:%u, s:%u, d:%u, mth:%u, y:%u",t.hour,t.minute,t.second,t.day,t.month,t.year);
         }
@@ -84,11 +90,11 @@ void HandleReceiveMessage(uint8_t *inputBuffer, uint16_t sizeOfInputBuffer, Prot
 }
 
 void MessageHandle::Begin(){
-    RegisterArgument(brdParam.GetValueAddress(PARAM_TOTAL_VALVE),sizeof(uint16_t),(ProtocolID)PROTOCOL_ID_TOTAL_VALVE);
     RegisterArgument((void*)&_pressure,sizeof(PressureTwoSensorValue),(ProtocolID)PROTOCOL_ID_PRESSURE);
     RegisterArgument((void*)brdParam.GetAddrRTC(),sizeof(RTC_t),(ProtocolID)PROTOCOL_ID_RTC_TIME);
-    RegisterArgument((void*)&_handshakeCode, 0, (ProtocolID)PROTOCOL_ID_HANDSHAKE);
+    RegisterArgument((void*)&_handshakeCode, sizeof(_handshakeCode), (ProtocolID)PROTOCOL_ID_HANDSHAKE);
     RegisterArgument((void*)&_vData,sizeof(ValveData),(ProtocolID)PROTOCOL_ID_VALVE);
+    RegisterArgument((void*)&_settingParams,sizeof(_settingParams),(uint8_t)PROTOCOL_ID_SETTING_PARAMS);
     RegisterReceivedCallbackEvent(&HandleReceiveMessage);
     RegisterErrorEvent(&ErrorMessage);
 }
@@ -99,6 +105,9 @@ void MessageHandle::Begin(){
 void TaskUART(void *pvParameters)
 {
     mesg.Begin();
+    vTaskDelay(10/portTICK_PERIOD_MS);// wait STM32 init done
+    bool onProcessStatus = brdParam.GetOnProcessValveStatus();
+    mesg.TransmitMessage(UART_NUM_2,PROTOCOL_ID_ON_PROCESS,SET_DATA_TO_THIS_DEVICE,(void*)&onProcessStatus,sizeof(onProcessStatus));
     while(1){
         mesg.WaitForEventUART();
         vTaskDelay(10/portTICK_PERIOD_MS);

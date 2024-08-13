@@ -1,4 +1,5 @@
 #include "BoardParameter.h"
+#include "Communication/MessageHandle.h"
 #include "nvs_flash.h"
 #include "esp_err.h"
 
@@ -39,8 +40,8 @@ static const char *DPmode[] = {
 };
 
 static const char *triggerValve[] = {
-    "On",
     "Off",
+    "On",
 };
 
 static ParamID preID;
@@ -137,6 +138,7 @@ esp_err_t BoardParameter::IncreaseNextValue(ParamID id){
             uint16_t *a = (uint16_t*)params[idxParam].value;
             if(*a >= params[idxParam].maxValue) *a = params[idxParam].maxValue;
             else *a += params[idxParam].stepChange;
+            
         }
         break;
         case TYPE_UINT32:{
@@ -154,6 +156,7 @@ esp_err_t BoardParameter::IncreaseNextValue(ParamID id){
         case TYPE_STRING:{
             if(params[idxParam].index >= params[idxParam].maxValue - 1) params[idxParam].index = params[idxParam].maxValue - 1;
             else params[idxParam].index++;
+            ESP_LOGW(TAG,"inc str idx:%u",params[idxParam].index);
         }
         break;
         default:
@@ -171,7 +174,7 @@ esp_err_t BoardParameter::DecreasePreviousValue(ParamID id){
         idxParam = GetParamIndexFromID(id);
         preID = id;
     }
-    if(idxParam == 255 || idxParam == PARAM_START_PARAM || idxParam == PARAM_END_PARAM) return ESP_ERR_INVALID_ARG;
+    if(idxParam == 255) return ESP_ERR_INVALID_ARG;
     DataType dataType = params[idxParam].dataType;
     switch(dataType){
         case TYPE_UINT8:{
@@ -202,6 +205,7 @@ esp_err_t BoardParameter::DecreasePreviousValue(ParamID id){
             // vì index là số nguyên dương nên khi 0 - 1 sẽ ra số dương max, do đó thêm điều kiện lớn hơn max index
             if(params[idxParam].index == 0 || params[idxParam].index > params[idxParam].maxValue - 1) params[idxParam].index = 0;
             else params[idxParam].index--;
+            ESP_LOGW(TAG,"inc str idx:%u",params[idxParam].index);
         }
         break;
         default:
@@ -230,6 +234,21 @@ esp_err_t BoardParameter::GetParameter(Parameter_t **pParam, ParamID id){
     return ESP_OK;
 }
 
+
+/**
+ * @brief - Cho biết hiện tại thông số id đang lựa chọn giá trị chuỗi nào trong mảng thông số chuỗi tương ứng để hiển thị ra màn hình (đang trả về phần tử index nào trong mảng - không phải giá trị phần tử đó)
+ * @brief - Go to definition (vscode) để xem ví dụ
+ * @example - uint8_t a = GetIndexOfStrParam(PARAM_TRIG_VALVE)
+ * @example - if a == 0 => Đang biểu thị cho chữ "On" và return 1 đang biểu thị cho chữ "Off"
+ * @example - Thay vì if(strcmp(s,"On") == 0)
+ * @note Sử dụng cách này thay thế cho việc so sánh chuỗi để thực hiện lệnh tương ứng với giá trị chuỗi đó
+ * @param id Thông số cần lấy phần tử của mảng chuỗi
+ * @return uint8_t
+ */
+uint8_t BoardParameter::GetIndexOfStrParam(ParamID id){
+    if(id < PARAM_STRING_PARAM_OFFSET || id >= PARAM_END_PARAM) return 255;
+    return params[GetParamIndexFromID(id)].index;
+}
 
 /**
  * @brief - Lấy giá trị chứa trong Parameter_t của phần tử đang giữ thông tin thông số id thuộc mảng params
@@ -288,7 +307,9 @@ esp_err_t BoardParameter::SaveParamsValueToFlash(){
         ESP_LOGE(TAG,"NVS Write Error (%s) opening NVS handle!", esp_err_to_name(err));
         return err;
     }
+
     err = nvs_set_blob(_brdHandleNVS,"ParamUI16",(void*)&paramUInt16,sizeof(paramUInt16));
+    
     if(err != ESP_OK) {
         ESP_LOGE(TAG,"NVS Write UI16 Error (%s)!", esp_err_to_name(err));
         return err;
@@ -329,7 +350,7 @@ esp_err_t BoardParameter::ReadParamsValueFromFlash(){
         ESP_LOGE(TAG,"NVS Read UI16 size different: %d, %u",sz,sizeof(paramUInt16));
         return ESP_ERR_INVALID_SIZE;
     }
-    err = nvs_get_blob(_brdHandleNVS,"ParamUI16",&paramUInt16,&sz);
+    err = nvs_get_blob(_brdHandleNVS,"ParamUI16",(void*)&paramUInt16,&sz);
     if(err != ESP_OK){
         ESP_LOGE(TAG,"NVS Read UI16 Error (%s) get data from NVS!", esp_err_to_name(err));
         return err;
@@ -368,33 +389,44 @@ void BoardParameter::Begin()
         ESP_ERROR_CHECK(nvs_flash_erase());
         err = nvs_flash_init();
     }
-    
-
 
     uint8_t i = 0;
-    brdParam.SetParameter(&params[i], "TotalValve", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_TOTAL_VALVE, 1, 0, 16, NULL); i++;
-    brdParam.SetParameter(&params[i], "DownTCycle", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_DOWN_TIME_CYCLE, 1, 0, 32, NULL); i++;
-    brdParam.SetParameter(&params[i], "CleanMode ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_ODC_CLEAN_MODE, 1, 1, 5, NULL); i++;
-    brdParam.SetParameter(&params[i], "TestMode  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_TEST_MODE, 1, 0, 7, NULL); i++;
-    brdParam.SetParameter(&params[i], "Contrast  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_DISPLAY_CONTRAST, 5, 10, 200, NULL); i++;
-    brdParam.SetParameter(&params[i], "DP-Low    ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_DP_LOW, 50, 250, 4000, "Pa"); i++;
-    brdParam.SetParameter(&params[i], "DP-High   ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_DP_HIGH, 50, 250, 4000, "Pa"); i++;
-    brdParam.SetParameter(&params[i], "DP-Alarm  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_DP_WARN, 50, 300, 5000, "Pa"); i++;
-    brdParam.SetParameter(&params[i], "ODC High  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_ODC_HIGH, 50, 250, 4000, "Pa"); i++;
-    brdParam.SetParameter(&params[i], "ODC Low   ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_ODC_LOW, 50, 250, 4000, "Pa"); i++;
-    brdParam.SetParameter(&params[i], "Pulse Time", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_PULSE_TIME, 10, 40, 300, "ms"); i++;
-    brdParam.SetParameter(&params[i], "Inter Time", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_INTERVAL_TIME, 2, 40, 500, "s"); i++;
-    brdParam.SetParameter(&params[i], "Cycle Time", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_CYCLE_INTERVAL_TIME, 1, 20, 100, "s"); i++;
-    brdParam.SetParameter(&params[i], "OperHour  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_OPERATE_HOURS, 100, 0, 25000, "h"); i++;
-    brdParam.SetParameter(&params[i], "ServRunH  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_SERV_RUN_HOURS, 100, 0, 25000, "h"); i++;
-    brdParam.SetParameter(&params[i], "ServAlarm ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_SERV_RUN_HOURS_ALARM, 100, 0, 25000, "h"); i++;
-    brdParam.SetParameter(&params[i], "Language  ", (void*)&language,    TYPE_STRING, PARAM_LANGUAGE, 0, FindTotalStringArrayElements(sizeof(language)), NULL); i++;
-    brdParam.SetParameter(&params[i], "DispRange ", (void*)&displayRange,TYPE_STRING, PARAM_DISPLAY_RANGE, 0, FindTotalStringArrayElements(sizeof(displayRange)), NULL); i++;
-    brdParam.SetParameter(&params[i], "ParamCode ", (void*)&paramCode,   TYPE_STRING, PARAM_PARAM_CODE, 0, FindTotalStringArrayElements(sizeof(paramCode)), NULL); i++;
-    brdParam.SetParameter(&params[i], "TechCode  ", (void*)&techCode,    TYPE_STRING, PARAM_TECH_CODE, 0, FindTotalStringArrayElements(sizeof(techCode)), NULL); i++;
-    brdParam.SetParameter(&params[i], "DP mode   ", (void*)&DPmode,      TYPE_STRING, PARAM_DP_MODE, 0, FindTotalStringArrayElements(sizeof(DPmode)), NULL); i++;
-    brdParam.SetParameter(&params[i], "TrigValve ", (void*)&triggerValve,TYPE_STRING, PARAM_TRIG_VALVE, 0, FindTotalStringArrayElements(sizeof(triggerValve)), NULL); i++;
+    SetParameter(&params[i], "TotalValve", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_TOTAL_VALVE, 1, 0, 15, NULL); i++;
+    SetParameter(&params[i], "DownTCycle", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_DOWN_TIME_CYCLE, 1, 0, 32, NULL); i++;
+    SetParameter(&params[i], "CleanMode ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_ODC_CLEAN_MODE, 1, 1, 5, NULL); i++;
+    SetParameter(&params[i], "TestMode  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_TEST_MODE, 1, 0, 7, NULL); i++;
+    SetParameter(&params[i], "Contrast  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_DISPLAY_CONTRAST, 5, 10, 200, NULL); i++;
+    SetParameter(&params[i], "DP-Low    ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_DP_LOW, 50, 250, 4000, "Pa"); i++;
+    SetParameter(&params[i], "DP-High   ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_DP_HIGH, 50, 250, 4000, "Pa"); i++;
+    SetParameter(&params[i], "DP-Alarm  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_DP_WARN, 50, 300, 5000, "Pa"); i++;
+    SetParameter(&params[i], "ODC High  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_ODC_HIGH, 50, 250, 4000, "Pa"); i++;
+    SetParameter(&params[i], "ODC Low   ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_ODC_LOW, 50, 250, 4000, "Pa"); i++;
+    SetParameter(&params[i], "Pulse Time", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_PULSE_TIME, 10, 40, 300, "ms"); i++;
+    SetParameter(&params[i], "Inter Time", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_INTERVAL_TIME, 1, 2, 100, "s"); i++;
+    SetParameter(&params[i], "Cycle Time", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_CYCLE_INTERVAL_TIME, 1, 2, 100, "s"); i++;
+    SetParameter(&params[i], "OperHour  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_OPERATE_HOURS, 100, 0, 25000, "h"); i++;
+    SetParameter(&params[i], "ServRunH  ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_SERV_RUN_HOURS, 100, 0, 25000, "h"); i++;
+    SetParameter(&params[i], "ServAlarm ", (void*)&paramUInt16[i], TYPE_UINT16, PARAM_SERV_RUN_HOURS_ALARM, 100, 0, 25000, "h"); i++;
+    SetParameter(&params[i], "Language  ", (void*)&language,    TYPE_STRING, PARAM_LANGUAGE, 0, FindTotalStringArrayElements(sizeof(language)), NULL); i++;
+    SetParameter(&params[i], "DispRange ", (void*)&displayRange,TYPE_STRING, PARAM_DISPLAY_RANGE, 0, FindTotalStringArrayElements(sizeof(displayRange)), NULL); i++;
+    SetParameter(&params[i], "ParamCode ", (void*)&paramCode,   TYPE_STRING, PARAM_PARAM_CODE, 0, FindTotalStringArrayElements(sizeof(paramCode)), NULL); i++;
+    SetParameter(&params[i], "TechCode  ", (void*)&techCode,    TYPE_STRING, PARAM_TECH_CODE, 0, FindTotalStringArrayElements(sizeof(techCode)), NULL); i++;
+    SetParameter(&params[i], "DP mode   ", (void*)&DPmode,      TYPE_STRING, PARAM_DP_MODE, 0, FindTotalStringArrayElements(sizeof(DPmode)), NULL); i++;
+    SetParameter(&params[i], "TrigValve ", (void*)&triggerValve,TYPE_STRING, PARAM_TRIG_VALVE, 0, FindTotalStringArrayElements(sizeof(triggerValve)), NULL); i++;
     ReadParamsValueFromFlash();
+    uint8_t idxTriggerValve = brdParam.GetIndexOfStrParam(PARAM_TRIG_VALVE);
+    if(idxTriggerValve == 255){
+        ESP_LOGE("GUI","TRIG VALVE param not found");
+        return;
+    } // mean "Off" 
+    else if(idxTriggerValve == 0){
+        brdParam.IsOnProcessValve(false);
+    } // mean "On"
+    else if(idxTriggerValve == 1){
+        brdParam.IsOnProcessValve(true);
+    }
+    
+
 }
 
 uint8_t FindTotalStringArrayElements(uint8_t sizeOfAllStringPointer)
@@ -404,16 +436,12 @@ uint8_t FindTotalStringArrayElements(uint8_t sizeOfAllStringPointer)
 
 void InitBoardParameter(){
     brdParam.Begin();
-    brdParam.IncreaseNextValue(PARAM_TOTAL_VALVE);
-    brdParam.IncreaseNextValue(PARAM_DISPLAY_RANGE);
-    brdParam.IncreaseNextValue(PARAM_DP_LOW);
-    brdParam.DecreasePreviousValue(PARAM_LANGUAGE);
     brdParam.PrintAllParameter();
 }
 
 void BoardParameter::PrintAllParameter(){
     for(uint8_t i = PARAM_TOTAL_VALVE; i < PARAM_END_PARAM; i++){
         if(i == 17) continue;
-        brdParam.PrintParameter((ParamID)i);
+        PrintParameter((ParamID)i);
     }
 }

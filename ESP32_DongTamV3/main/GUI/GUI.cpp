@@ -2,16 +2,20 @@
 #include "../BoardParameter.h"
 #include "esp_timer.h"
 #include "../OnlineManage/OnlineManage.h"
+#include "../Communication/MessageHandle.h"
 TaskHandle_t taskHandleGUI;
 GUI_Manager gui;
 EventGroupHandle_t evgGUI;
 extern BoardParameter brdParam;
+extern MessageHandle mesg;
 Page prePage;
+static const char* TAG = "GUI";
 void HandleEventResetLCD();
 void OnPageRun();
 void HandleNextPageEvent();
 void HandleChangeValueEvent();
 void SaveFlashAction();
+void SendSettingParamToSTM32();
 /**
  * @brief Thứ tự hiển thị các thông số trên màn hình khớp với giao diện gốc của Đồng Tâm
  * Đây không phải thứ tự thực sự của thông số trong BoardParameter.h mà là thứ tự đã được mapping lại
@@ -43,7 +47,11 @@ ParamID paramMappingDisplay[] = {
 };
 
 
-
+/**
+ * @brief Quản lý toàn bộ tác vụ có liên quan đến hiển thị màn hình LCD, led error và led status
+ * Nhận sự kiện từ task TaskScanButton và xử lý tương ứng tại GUI_Navigator
+ * @param pvParameter 
+ */
 void TaskManageGUI(void *pvParameter)
 {
     EventBits_t e;
@@ -56,6 +64,7 @@ void TaskManageGUI(void *pvParameter)
             ParamID id = paramMappingDisplay[gui.GetParamDisplayIndex()]; 
             gui.AllowSpeedUpValueIfPointerNowIsValue(id);
             HandleNextPageEvent();
+            SendSettingParamToSTM32();
             SaveFlashAction();
             HandleChangeValueEvent();
             GUI_LoadParamsToBuffer();
@@ -66,6 +75,10 @@ void TaskManageGUI(void *pvParameter)
     }
 }
 
+/**
+ * @brief Hiển thị thông tin áp suất AMS5915, SP100, thời gian, valve hiện tại đang kích và trạng thái kích valve trên màn hình LCD
+ * Ngoài ra hiển thị trạng thái kết nối mạng wifi và server
+ */
 void OnPageRun(){
     if(gui.GetCurrentPage() != PAGE_RUN) return;
     EventBits_t e = xEventGroupWaitBits(evgGUI,SHIFT_BIT_LEFT(GUI_EVT_UPDATE_VALUE_FROM_UART), pdTRUE, pdFALSE, 0);
@@ -98,7 +111,7 @@ void OnPageRun(){
         if(OnlineManage_CheckEvent(ONLEVT_STA_GOT_IP)){
             gui.print("WIFI CONNECTED",0,0);
             gui.print(OnlineManage_GetStationSSID(),0,1);
-            if(OnlineManage_GetCodeHTTP() != HTTP_OK){// HTTP_OK
+            if(OnlineManage_GetCodeHTTP() != HTTP_OK && OnlineManage_GetCodeHTTP() != 0){// HTTP_OK or not send
                 gui.print("Connect Server fail",0,2);
                 char s[20] = {0};
                 sprintf(s,"Err:%d",OnlineManage_GetCodeHTTP());
@@ -197,6 +210,11 @@ void OnPageRun(){
     // In valve đang kích và trạng thái valve
     lcdRow++;
     strcpy(s,"Valve:");
+    if(brdParam.GetOnProcessValveStatus() == false){
+        strcat(s,"Not run");
+        gui.print(s,0,lcdRow);
+        return;
+    }
     temp = sprintf(s + strlen(s),"%u ",currentVavleTrigger + 1);
     valveStatus > 0 ? strcat(s,"OK") : strcat(s,"Err");
     if(valveStatus == 0){
@@ -216,20 +234,94 @@ void OnPageRun(){
     memset(s,0,strlen(s));
 }
 
+
+/**
+ * @brief Gửi thông số cài đặt và điều khiển bật tắt chu trình kích van ở STM32
+ * @note Hàm này phải được gọi trước SaveFlashAction, nếu không sẽ bị xóa cờ GUI_EVT_WRITE_PARAMS_TO_FLASH
+ * ở SaveFlashAction
+ */
+void SendSettingParamToSTM32()
+{
+    EventBits_t e;
+    // Không được xóa sự kiện này
+    e = xEventGroupGetBits(evgGUI);
+    if(CHECKFLAG(e,GUI_EVT_WRITE_PARAMS_TO_FLASH) == false) return;
+    // GetParamDisplayIndex hiện tại đang trỏ tới phần tử nào trong paramMappingDisplay, lấy giá trị của phần tử trong paramMappingDisplay sẽ ra được thông số của ParamID trong BoardParameter
+    ParamID currentSettingID = paramMappingDisplay[gui.GetParamDisplayIndex()];
+    ESP_LOGI(TAG,"SendSettingParam - currentSettingID: %d",currentSettingID);
+    // Nếu thông số không phải là giá trị chuỗi
+    if(currentSettingID < PARAM_STRING_PARAM_OFFSET){
+        // Chỉ cần có 1 thông số thuộc protocol ID thì gửi hết giá trị có quy định trong protocol tới STM32
+        /*
+            Cách này chỉ là tạm, kiểm tra con trỏ với GetPointerNow, nếu IS_VALUE thì gửi ID thông số
+            sử dụng QueueSend và ở đây sẽ nhận từng item từ Queue rồi kiểm tra có thuộc ID mà Protocol quy định hay không và chỉ gửi đúng 1 thông số  
+
+        */ 
+        bool isAllowToSend = currentSettingID == PARAM_TOTAL_VALVE ? 1 :
+                             currentSettingID == PARAM_PULSE_TIME ? 1 :
+                             currentSettingID == PARAM_INTERVAL_TIME ? 1 :
+                             currentSettingID == PARAM_CYCLE_INTERVAL_TIME ? 1 : 0;
+        if(isAllowToSend){
+            mesg.LoadSettingParam(
+                *(uint16_t*)brdParam.GetValueAddress(PARAM_TOTAL_VALVE),
+                *(uint16_t*)brdParam.GetValueAddress(PARAM_PULSE_TIME),
+                *(uint16_t*)brdParam.GetValueAddress(PARAM_INTERVAL_TIME),
+                *(uint16_t*)brdParam.GetValueAddress(PARAM_CYCLE_INTERVAL_TIME)
+            );
+            ESP_LOGI(TAG,"SendSettingParam - protocol ID detected, send to STM32: totalValve: %u, pulseTime: %u,intervalTime: %u, cycleIntervalTime: %u,",
+            *(uint16_t*)brdParam.GetValueAddress(PARAM_TOTAL_VALVE),
+            *(uint16_t*)brdParam.GetValueAddress(PARAM_PULSE_TIME),
+            *(uint16_t*)brdParam.GetValueAddress(PARAM_INTERVAL_TIME),
+            *(uint16_t*)brdParam.GetValueAddress(PARAM_CYCLE_INTERVAL_TIME));
+            mesg.TransmitMessage(UART_NUM_2,PROTOCOL_ID_SETTING_PARAMS,SET_DATA_TO_THIS_DEVICE);
+        }                             
+    } 
+    else {
+        ESP_LOGI(TAG,"SendSettingParam - currentSettingID: %d",currentSettingID);
+        if(currentSettingID == PARAM_TRIG_VALVE){
+            uint8_t idxTriggerValve = brdParam.GetIndexOfStrParam(currentSettingID);
+            ESP_LOGI(TAG,"SendSettingParam - Trig valve detected, idx:%u",idxTriggerValve);
+            if(idxTriggerValve == 255){
+                ESP_LOGE("GUI","TRIG VALVE param not found");
+                return;
+            } // mean "Off" 
+            else if(idxTriggerValve == 0){
+                brdParam.IsOnProcessValve(false);
+            } // mean "On"
+            else if(idxTriggerValve == 1){
+                brdParam.IsOnProcessValve(true);
+            }
+            bool onProcessStatus = brdParam.GetOnProcessValveStatus();
+            ESP_LOGI(TAG,"SendSettingParam - OnProcessStatus: %d, send to STM32",onProcessStatus);
+            mesg.TransmitMessage(UART_NUM_2,PROTOCOL_ID_ON_PROCESS,SET_DATA_TO_THIS_DEVICE,(void*)&onProcessStatus,sizeof(onProcessStatus));
+        }
+    }
+    
+
+}
+
+/**
+ * @brief Khi nhấn nút MENU nếu con trỏ đang trỏ tới tên thông số (IS_KEYWORD)
+ * thì sẽ thực hiện clear màn hình LCD và chuyển trang
+ */
 void HandleNextPageEvent(){
+    static bool alreadyDone = false;
     EventBits_t e = xEventGroupWaitBits(evgGUI,
     SHIFT_BIT_LEFT(GUI_EVT_NEXT_PAGE)
     ,pdTRUE,pdFALSE,0);
     if(CHECKFLAG(e,GUI_EVT_NEXT_PAGE) == true){
         gui.clear(); // clear LCD
         vTaskDelay(20/portTICK_PERIOD_MS);
+        alreadyDone = false;
     } else return;
     if(gui.GetCurrentPage() == PAGE_SETTING){
-        // Cần phải có sự kiện này thì màn hình mới refresh, không thì sẽ không hiển thị
+        if(alreadyDone == true) return;
+        // Cần phải có sự kiện này thì màn hình mới refresh để nạp thông số vào buffer vì hàm này sẽ reset buffer GUI, không thì sẽ không hiển thị
         xEventGroupSetBits(evgGUI,SHIFT_BIT_LEFT(GUI_EVT_REFRESH_NEXT_PARAMS_DISPLAY));
         gui.ResetPointer();
         gui.ResetBufferGUI();
         gui.ResetParamDisplayIndex();
+        alreadyDone = true;
     }
 }
 
@@ -248,9 +340,6 @@ void SaveFlashAction()
     gui.PrintParamsToLCD();
 }
 
-
-
-
 void HandleEventResetLCD(){
     EventBits_t e;
     // Kiểm tra nếu có sự kiện refresh và load thông số mới vào bộ đệm
@@ -261,7 +350,7 @@ void HandleEventResetLCD(){
 }
 
 /**
- * @brief Load các thông số vào bộ đệm GUI
+ * @brief Load các thông số vào bộ đệm GUI - 4 phần tử bộ đệm cho 4 hàng thông số, nếu có sự kiện refresh màn hình, sau đó in ra màn hình các thông số từ bộ đệm
  */
 void GUI_LoadParamsToBuffer(){
     if(gui.GetCurrentPage() != PAGE_SETTING) return;
@@ -348,6 +437,8 @@ void HandleChangeValueEvent(){
     SHIFT_BIT_LEFT(GUI_EVT_INCREASE_VALUE) | 
     SHIFT_BIT_LEFT(GUI_EVT_DECREASE_VALUE) 
     ,pdTRUE,pdFALSE,0);
+    // Lấy thông số hiện tại đang thao tác trên màn hình 
+    // GetParamDisplayIndex hiện tại đang trỏ tới phần tử nào trong paramMappingDisplay, lấy giá trị của phần tử trong paramMappingDisplay sẽ ra được thông số của ParamID trong BoardParameter
     ParamID id = paramMappingDisplay[gui.GetParamDisplayIndex()];
     if(CHECKFLAG(e,GUI_EVT_INCREASE_VALUE) == true) {
         brdParam.IncreaseNextValue(id);

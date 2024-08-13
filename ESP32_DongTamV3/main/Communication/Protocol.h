@@ -21,8 +21,6 @@ extern "C" {
 }
 #endif
 
-
-
 typedef uint8_t ProtocolID;
 
 typedef enum GetSetFlag {
@@ -88,11 +86,10 @@ class Protocol {
 		FrameData _fd;
 		ArgumentOfProtocolList_t argID[PROTOCOL_ID_END - 1];
 
-
 		/**
 		 * @brief Kiểm tra mã CRC từ bộ đệm đầu vào, nếu khác 0 thì khung truyền bị lỗi.
 		 * @param data Bộ đệm đầu vào chứa khung truyền
-		 * @return 
+		 * @return
 		 */
 		bool IsPassCRC(uint8_t *data) {
 
@@ -105,7 +102,7 @@ class Protocol {
 		/**
 		 * @brief Tự động cập nhật dữ liệu từ bộ đệm cho trước vào đối số tương ứng đã được đăng ký.
 		 * @note - Yêu cầu đăng ký đầy đủ bộ đệm input, output với RegisterStorageBuffer và đối số đã được đăng ký trước bởi
-		 * RegisterArgument. 
+		 * RegisterArgument.
 		 * @note - Phải gọi DecodeFrameAndCheckCRC trước.
 		 */
 		void GetValueFromPayload() {
@@ -123,7 +120,7 @@ class Protocol {
 		/**
 		 * @brief Lấy payload từ khung truyền và đưa vào bộ đệm đầu ra do người dùng tự cung cấp.
 		 * @note - Yêu cầu đăng ký RegisterStorageBuffer để có bộ đệm input nhận dữ liệu.
-		 * @note - Không cần đăng ký đối số RegisterArgument. 
+		 * @note - Không cần đăng ký đối số RegisterArgument.
 		 * @note - Phải gọi DecodeFrameAndCheckCRC trước.
 		 * @param outputBuffer con trỏ trỏ tới bộ đệm đầu ra sẽ được chứa payload.
 		 * @param sizeOfOutputBuffer kích thước bộ đệm (lớn hơn hoặc bằng độ dài payload).
@@ -140,7 +137,7 @@ class Protocol {
 
 		/**
 		 * @brief Tách lấy payload từ bộ đệm đầu vào và tự động cập nhật vào đối số tương ứng đã được đăng ký trước.
-		 * @note - Yêu cầu đăng ký đối số (RegisterArgument). 
+		 * @note - Yêu cầu đăng ký đối số (RegisterArgument).
 		 * @note - Không cần đăng ký bộ đệm (RegisterStorageBuffer).
 		 * @note - Phải gọi DecodeFrameAndCheckCRC trước.
 		 * @param inputBuffer Địa chỉ bộ đệm khung truyền dữ liệu có chứa payload cần tách.
@@ -272,6 +269,10 @@ class Protocol {
 			if (_pRxBuffer == NULL)
 				return PROTOCOL_ERR_STORE_BUFFER_IS_NULL;
 			_fd.totalLength = *(_pRxBuffer + 0);
+			// Tổng chiều dài khung truyền không thể nhỏ hơn khung truyền có payload 1 byte vì đây là khung truyền
+			// có kích thước tối thiểu
+			if (_fd.totalLength < PROTOCOL_TOTAL_LENGTH(1))
+				JumpToError(PROTOCOL_ERR_FRAME_ERROR);
 			return _fd.totalLength;
 		}
 
@@ -281,15 +282,13 @@ class Protocol {
 			_fd.payloadLength = PROTOCOL_PAYLOAD_LENGTH(_fd.totalLength);
 			_fd.protocolID = (ProtocolID) *(_pRxBuffer + PROTOCOL_ID_FIELD);
 			_fd.getSetFlag = (GetSetFlag) *(_pRxBuffer + PROTOCOL_GET_SET_FIELD);
-			if (_fd.payloadLength != argID[_fd.protocolID].sizeArgument)
-				JumpToError(PROTOCOL_ERR_FRAME_ERROR);
 			uint32_t crcNibbleByteMSB = *(_pRxBuffer + PROTOCOL_CRC16_FIELD(_fd.payloadLength)) << 8;
 			uint32_t crcNibbleByteLSB = *(_pRxBuffer + PROTOCOL_CRC16_FIELD(_fd.payloadLength) + 1);
 			_fd.crc16 = crcNibbleByteMSB | crcNibbleByteLSB;
 			if (!IsPassCRC(_pRxBuffer))
 				JumpToError(PROTOCOL_ERR_CRC_FAIL);
 			if (_pProlCallback != NULL)
-				_pProlCallback(NULL, 0,_fd.protocolID, _fd.getSetFlag);
+				_pProlCallback(NULL, 0, _fd.protocolID, _fd.getSetFlag);
 			else
 				JumpToError(PROTOCOL_ERR_NULL_CALLBACK_FUNCTION);
 		}
@@ -349,8 +348,9 @@ class Protocol {
 			_pRxBuffer = pRxBuffer;
 			_rxBufSize = rxBufferSize;
 		}
- 
+
 		void RegisterArgument(void *arg, uint8_t sizeOfArgument, ProtocolID protocolID) {
+			if(sizeOfArgument == 0) JumpToError(PROTOCOL_ERR_STORE_BUFFER_IS_NULL);
 			argID[protocolID].pArg = arg;
 			argID[protocolID].sizeArgument = sizeOfArgument;
 		}

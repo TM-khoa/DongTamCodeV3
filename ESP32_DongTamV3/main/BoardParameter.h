@@ -79,6 +79,7 @@ private:
     uint8_t _currentValveTrigger;
     uint16_t _valveStatus;
     nvs_handle_t _brdHandleNVS;
+    bool _isOnProcess;
 public:
     void Begin();
     void SetParameter(Parameter_t *param, const char* keyName, void* value, DataType dataType, ParamID id, uint8_t stepChange, uint16_t minValue, uint16_t maxValue,const char* unit);
@@ -90,6 +91,13 @@ public:
     esp_err_t DecreasePreviousValue(ParamID id);
     esp_err_t GetParameter(Parameter_t **pParam, ParamID id);
     void* GetValueAddress(ParamID id);
+    void IsOnProcessValve(bool on){
+        if(on) _isOnProcess = true;
+        else _isOnProcess = false;
+    }
+    bool GetOnProcessValveStatus(){return _isOnProcess;}
+
+    uint8_t GetIndexOfStrParam(ParamID id);
     esp_err_t SaveParamsValueToFlash();
     esp_err_t ReadParamsValueFromFlash();
 
