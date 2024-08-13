@@ -87,7 +87,7 @@ ESP32/
 - Store user-defined parameter settings.
 - Provide APIs for getting and setting parameter data for other modules.
 
-### main DongTamESP32.cpp:
+### DongTamESP32.cpp:
 - Integrate all modules together.
 
 
