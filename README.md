@@ -182,10 +182,10 @@ WIFI CONNECTED
 
 ## Mobile app
 
-__*Note*__: These instruction are only applicable on Android devices.
+__*Note*__: These instructions are only applicable to Android devices.
 
-1. Open CH play store on user Android mobile devices
-2. Searching for IoTVision app store and dowloading the app
-3. Open IoTVision app and login user account 
-4. If user login is successful. The app will appear as shown below
+1. Open the Google Play Store on your Android device.
+2. Search for the IoTVision app and download it.
+3. Open the IoTVision app and log in to your account.
+4. If the login is successful. The app will appear as shown below
 ![PressureChart](image/PressureChart%20.jpg)
